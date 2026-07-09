@@ -234,6 +234,15 @@ export function listDocuments(): DocumentRecord[] {
   return rows.map(toDocument);
 }
 
+/** Documents stuck in "pending" past a generous deadline — almost always a crashed/restarted process. */
+export function listStalePendingDocuments(olderThanMs: number): DocumentRecord[] {
+  const cutoff = Date.now() - olderThanMs;
+  const rows = getDb()
+    .prepare(`SELECT * FROM documents WHERE status = 'pending' AND created_at < ?`)
+    .all(cutoff) as DocumentRow[];
+  return rows.map(toDocument);
+}
+
 export function getDocumentRecord(id: string): DocumentRecord | null {
   const row = getDb().prepare(`SELECT * FROM documents WHERE id = ?`).get(id) as DocumentRow | undefined;
   return row ? toDocument(row) : null;

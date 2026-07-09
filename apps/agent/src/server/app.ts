@@ -15,7 +15,7 @@ import {
 } from "../agent/historyStore.js";
 import { deleteConversationFiles } from "../agent/fileCleanup.js";
 import { ingestDocument } from "../agent/documentIngest.js";
-import { deleteDocumentRecord, getDocumentRecord, listDocuments } from "../agent/documentStore.js";
+import { deleteDocumentRecord, getChunksForDocument, getDocumentRecord, listDocuments } from "../agent/documentStore.js";
 import { config } from "../config.js";
 
 export function buildApp(): express.Express {
@@ -115,15 +115,24 @@ export function buildApp(): express.Express {
       res.status(404).json({ error: "Not found" });
       return;
     }
+    // Gather every file-storage object this document owns — the original upload,
+    // any extracted figure images, and any full-page renders — before the DB rows
+    // that reference them are gone.
+    const filenames = new Set<string>([doc.fileStorageFilename]);
+    for (const chunk of getChunksForDocument(req.params.id)) {
+      if (chunk.imageUrl) filenames.add(chunk.imageUrl.split("/").pop()!);
+    }
+    for (const url of Object.values(doc.pageImageUrls)) {
+      filenames.add(url.split("/").pop()!);
+    }
+
     deleteDocumentRecord(req.params.id);
     res.status(204).end();
-    try {
-      await fetch(`${config.fileStorageBaseUrl}/files/${encodeURIComponent(doc.fileStorageFilename)}`, {
-        method: "DELETE",
-      });
-    } catch {
-      // best-effort; an orphan sweep can catch this later if we add one
-    }
+    await Promise.allSettled(
+      [...filenames].map((filename) =>
+        fetch(`${config.fileStorageBaseUrl}/files/${encodeURIComponent(filename)}`, { method: "DELETE" }),
+      ),
+    );
   });
 
   // A2A surface.

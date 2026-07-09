@@ -28,6 +28,7 @@ import {
   getDocumentRecord,
   insertChunks,
   insertDocument,
+  listStalePendingDocuments,
   markDocumentFailed,
   updateDocumentIngestResult,
 } from "./documentStore.js";
@@ -107,4 +108,21 @@ async function runIngestPipeline(id: string, url: string): Promise<void> {
   }
 
   void runBackgroundEnrichment(id, figures);
+}
+
+/**
+ * Marks documents stuck in "pending" as failed. The only way a document gets
+ * permanently stuck there (ingestDocument's .catch always resolves pending ->
+ * failed/ready on a normal error) is the process dying mid-ingest — a dev
+ * `--watch` restart or a hard crash — so this only needs to run once at
+ * startup, not on a timer. Call once from index.ts.
+ */
+export function reconcileStuckDocuments(): void {
+  const stale = listStalePendingDocuments(config.documentIngestTimeoutMs * 2);
+  for (const doc of stale) {
+    markDocumentFailed(doc.id, "Ingestion did not complete, likely because the server restarted mid-process. Try re-uploading.");
+  }
+  if (stale.length > 0) {
+    console.log(`[agent] document-ingest: marked ${stale.length} stuck "pending" document(s) as failed`);
+  }
 }

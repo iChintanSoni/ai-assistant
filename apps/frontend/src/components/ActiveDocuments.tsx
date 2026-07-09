@@ -59,6 +59,7 @@ export function ActiveDocuments() {
         return (
           <span
             key={id}
+            title={status === "failed" ? (doc?.error ?? "Failed to process") : undefined}
             className="flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1 pr-1.5 pl-2.5 text-xs text-slate-600 ring-1 ring-slate-200/70 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/60"
           >
             {status === "failed" ? (
