@@ -23,6 +23,8 @@ export interface DocumentRecord {
   sizeClass: SizeClass;
   fileStorageFilename: string;
   fullText: string | null;
+  /** page number (string) -> file-storage URL, for pages that contain a detected figure. */
+  pageImageUrls: Record<string, string>;
   summary: string | null;
   summaryStatus: SummaryStatus;
   status: DocumentStatus;
@@ -66,6 +68,7 @@ interface DocumentRow {
   size_class: SizeClass;
   file_storage_filename: string;
   full_text: string | null;
+  page_image_urls: string | null;
   summary: string | null;
   summary_status: SummaryStatus;
   status: DocumentStatus;
@@ -103,6 +106,7 @@ function getDb(): Database.Database {
         size_class TEXT NOT NULL DEFAULT 'pending',
         file_storage_filename TEXT NOT NULL,
         full_text TEXT,
+        page_image_urls TEXT,
         summary TEXT,
         summary_status TEXT NOT NULL DEFAULT 'pending',
         status TEXT NOT NULL DEFAULT 'pending',
@@ -140,6 +144,7 @@ function toDocument(row: DocumentRow): DocumentRecord {
     sizeClass: row.size_class,
     fileStorageFilename: row.file_storage_filename,
     fullText: row.full_text,
+    pageImageUrls: row.page_image_urls ? (JSON.parse(row.page_image_urls) as Record<string, string>) : {},
     summary: row.summary,
     summaryStatus: row.summary_status,
     status: row.status,
@@ -178,6 +183,7 @@ export function insertDocument(args: {
     size_class: "pending",
     file_storage_filename: args.fileStorageFilename,
     full_text: null,
+    page_image_urls: null,
     summary: null,
     summary_status: "pending",
     status: "pending",
@@ -205,6 +211,12 @@ export function updateDocumentIngestResult(
       `UPDATE documents SET page_count = ?, size_class = ?, full_text = ?, status = ?, error = ?, updated_at = ? WHERE id = ?`,
     )
     .run(patch.pageCount, patch.sizeClass, patch.fullText, patch.status, patch.error ?? null, Date.now(), id);
+}
+
+export function updateDocumentPageImages(id: string, pageImageUrls: Record<string, string>): void {
+  getDb()
+    .prepare(`UPDATE documents SET page_image_urls = ?, updated_at = ? WHERE id = ?`)
+    .run(JSON.stringify(pageImageUrls), Date.now(), id);
 }
 
 export function updateDocumentSummary(id: string, summary: string | null, status: SummaryStatus): void {

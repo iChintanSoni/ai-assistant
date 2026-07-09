@@ -74,7 +74,7 @@ export interface DoclingDocument {
   pictures: DoclingPictureItem[];
   groups: DoclingGroup[];
   body: DoclingBody;
-  pages: Record<string, { size: { width: number; height: number } }>;
+  pages: Record<string, { size: { width: number; height: number }; image?: { mimetype: string; uri: string } }>;
 }
 
 export interface ConvertedDocument {

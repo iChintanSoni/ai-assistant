@@ -19,6 +19,7 @@ import { embedOne } from "./embeddings.js";
 import { summarizeScoped, summarizeWholeDocument } from "./documentSummarize.js";
 import {
   type SearchResult as DocumentSearchResult,
+  getChunksForDocument,
   getDocumentRecord,
   getDocumentsByIds,
   listDocuments,
@@ -278,6 +279,11 @@ const searchDocuments = tool(
     const smallDocs = docs.filter((d) => d.sizeClass === "small");
     for (const d of smallDocs) {
       hits.push({ documentId: d.id, documentName: d.originalName, page: `1-${d.pageCount}`, text: d.fullText ?? "" });
+      // Figures aren't part of the extracted body text, so a small doc's full-text
+      // dump above won't mention them — surface their captions explicitly too.
+      for (const fig of getChunksForDocument(d.id).filter((c) => c.kind === "figure")) {
+        hits.push({ documentId: d.id, documentName: d.originalName, page: pageLabel(fig.pageStart, fig.pageEnd), text: `[Figure] ${fig.text}` });
+      }
     }
 
     const largeDocIds = docs.filter((d) => d.sizeClass === "large").map((d) => d.id);
@@ -335,6 +341,38 @@ const summarizeDocument = tool(
   },
 );
 
+const viewDocumentPage = tool(
+  async ({ documentId, page }) => {
+    const doc = getDocumentRecord(documentId);
+    if (!doc) return `No document found with id "${documentId}".`;
+    if (doc.status !== "ready") return `"${doc.originalName}" is still being processed — try again shortly.`;
+
+    const imageUrl = doc.pageImageUrls[String(page)];
+    if (imageUrl) return JSON.stringify({ url: imageUrl, documentName: doc.originalName, page });
+
+    const text = getChunksForDocument(documentId)
+      .filter((c) => c.pageStart <= page && c.pageEnd >= page)
+      .map((c) => c.text)
+      .join("\n\n");
+    return text
+      ? `No rendered image is available for page ${page} of "${doc.originalName}" (no figure was detected there). Its text content:\n\n${text}`
+      : `No content found for page ${page} of "${doc.originalName}".`;
+  },
+  {
+    name: "view_document_page",
+    description:
+      "Show the user the rendered image of a specific document page — use this when they ask to see or " +
+      "be shown a figure/chart/diagram directly, after search_documents or summarize_document has told you " +
+      "which page it's on. The UI displays the actual image to the user directly; you cannot see the image " +
+      "yourself, only whether one was found, so don't claim to describe visual detail beyond what " +
+      "search_documents' figure caption already told you.",
+    schema: z.object({
+      documentId: z.string().describe("The document to view a page from"),
+      page: z.number().int().describe("The page number to view"),
+    }),
+  },
+);
+
 export function getTools() {
   return [
     getCurrentTime,
@@ -345,6 +383,7 @@ export function getTools() {
     generateImageTool,
     searchDocuments,
     summarizeDocument,
+    viewDocumentPage,
   ];
 }
 

@@ -1,19 +1,26 @@
 /**
  * Orchestrates turning an uploaded file into a searchable document: Docling
  * conversion -> page-tagged chunking -> small/large classification -> (for
- * large docs) chunk embedding. Runs in the background — insertDocument
- * returns a "pending" row immediately, the pipeline flips it to "ready" or
- * "failed" once done, and the frontend polls GET /documents/:id for status.
+ * large docs) chunk embedding -> figure image upload. Runs in the
+ * background — insertDocument returns a "pending" row immediately, the
+ * pipeline flips it to "ready" or "failed" once done, and the frontend polls
+ * GET /documents/:id for status.
  *
- * Figure captioning and whole-document summarization are separate ingest
- * steps layered on top of this in later phases; this pipeline is already a
- * complete, independently useful increment (a document becomes searchable by
- * text/table content without them).
+ * Figure captioning and whole-document summarization both need slow,
+ * sequential LLM calls, so — like precomputeSummary — they run as a
+ * fire-and-forget background step *after* the document is already "ready"
+ * and text-searchable, rather than blocking on them. They're chained
+ * sequentially with each other (not fired concurrently): a local Ollama
+ * instance serializes requests onto one model/GPU anyway, so two concurrent
+ * background jobs each doing their own sequential calls would still queue
+ * against each other and risk the same header-timeout failure documented in
+ * documentSummarize.ts.
  */
 import { cleanupConversion, convertDocument } from "./docling.js";
 import { chunkDocument, estimateTokens, fullText, pageCount } from "./documentChunker.js";
 import { embed } from "./embeddings.js";
 import { precomputeSummary } from "./documentSummarize.js";
+import { captionAndIndexFigures, uploadFigures, uploadPageImages } from "./documentFigures.js";
 import { config } from "../config.js";
 import {
   type DocumentRecord,
@@ -47,9 +54,17 @@ export function ingestDocument(args: IngestArgs): DocumentRecord {
   return record;
 }
 
+/** Sequential, not fired concurrently — see the module comment on why. */
+async function runBackgroundEnrichment(id: string, figures: Awaited<ReturnType<typeof uploadFigures>>): Promise<void> {
+  if (figures.length > 0) await captionAndIndexFigures(id, figures);
+  const record = getDocumentRecord(id);
+  if (record) await precomputeSummary(record);
+}
+
 async function runIngestPipeline(id: string, url: string): Promise<void> {
+  let figures: Awaited<ReturnType<typeof uploadFigures>> = [];
   try {
-    const { doc } = await convertDocument(url, id);
+    const { doc, artifactsDir } = await convertDocument(url, id);
 
     const chunks = chunkDocument(doc, config.documentChunkTokenBudget);
     const whole = fullText(doc);
@@ -75,16 +90,21 @@ async function runIngestPipeline(id: string, url: string): Promise<void> {
       );
     }
 
+    // Must happen before cleanupConversion() below deletes the scratch dir these read from.
+    figures = await uploadFigures(doc, artifactsDir, chunks.length);
+    if (figures.length > 0) {
+      await uploadPageImages(doc, id, figures.map((f) => f.pageNo));
+    }
+
     updateDocumentIngestResult(id, {
       pageCount: pageCount(doc),
       sizeClass,
       fullText: sizeClass === "small" ? whole : null,
       status: "ready",
     });
-
-    const record = getDocumentRecord(id);
-    if (record) void precomputeSummary(record);
   } finally {
     await cleanupConversion(id);
   }
+
+  void runBackgroundEnrichment(id, figures);
 }
