@@ -15,6 +15,15 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { config } from "../config.js";
 import { generateImage } from "./imageGen.js";
+import { embedOne } from "./embeddings.js";
+import { summarizeScoped, summarizeWholeDocument } from "./documentSummarize.js";
+import {
+  type SearchResult as DocumentSearchResult,
+  getDocumentRecord,
+  getDocumentsByIds,
+  listDocuments,
+  searchChunks,
+} from "./documentStore.js";
 
 const getCurrentTime = tool(
   async () => new Date().toISOString(),
@@ -236,8 +245,107 @@ const generateImageTool = tool(
   },
 );
 
+// ---------------------------------------------------------------------------
+// search_documents / summarize_document (uploaded document library, read-only)
+// ---------------------------------------------------------------------------
+
+interface DocSearchHit {
+  documentId: string;
+  documentName: string;
+  page: string;
+  text: string;
+}
+
+function pageLabel(pageStart: number, pageEnd: number): string {
+  return pageStart === pageEnd ? String(pageStart) : `${pageStart}-${pageEnd}`;
+}
+
+const searchDocuments = tool(
+  async ({ query, documentIds }) => {
+    const ids =
+      documentIds && documentIds.length > 0
+        ? documentIds
+        : listDocuments()
+            .filter((d) => d.status === "ready")
+            .map((d) => d.id);
+    if (ids.length === 0) return "No documents are available to search.";
+
+    const docs = getDocumentsByIds(ids).filter((d) => d.status === "ready");
+    if (docs.length === 0) return "None of the given document IDs match a ready document.";
+
+    const hits: DocSearchHit[] = [];
+
+    const smallDocs = docs.filter((d) => d.sizeClass === "small");
+    for (const d of smallDocs) {
+      hits.push({ documentId: d.id, documentName: d.originalName, page: `1-${d.pageCount}`, text: d.fullText ?? "" });
+    }
+
+    const largeDocIds = docs.filter((d) => d.sizeClass === "large").map((d) => d.id);
+    if (largeDocIds.length > 0) {
+      const queryVector = await embedOne(query);
+      const results: DocumentSearchResult[] = searchChunks(largeDocIds, queryVector, 5);
+      for (const r of results) {
+        hits.push({ documentId: r.documentId, documentName: r.documentName, page: pageLabel(r.pageStart, r.pageEnd), text: r.text });
+      }
+    }
+
+    if (hits.length === 0) return "No relevant content found.";
+    return JSON.stringify(hits);
+  },
+  {
+    name: "search_documents",
+    description:
+      "Search the user's uploaded documents for content relevant to a question. Returns excerpts with " +
+      "the source document name and page number(s) — cite them when you answer. Use this for specific " +
+      "questions ('what does X say about Y'); use summarize_document instead for overview/summary requests.",
+    schema: z.object({
+      query: z.string().describe("What to search for"),
+      documentIds: z
+        .array(z.string())
+        .optional()
+        .describe("Specific document IDs to search. Omit to search across all uploaded documents."),
+    }),
+  },
+);
+
+const summarizeDocument = tool(
+  async ({ documentId, pageStart, pageEnd }) => {
+    const doc = getDocumentRecord(documentId);
+    if (!doc) return `No document found with id "${documentId}".`;
+    if (doc.status !== "ready") return `"${doc.originalName}" is still being processed — try again shortly.`;
+
+    if (pageStart === undefined && pageEnd === undefined) {
+      if (doc.summaryStatus === "ready" && doc.summary) return doc.summary;
+      return summarizeWholeDocument(doc);
+    }
+    return summarizeScoped(doc, pageStart ?? 1, pageEnd ?? doc.pageCount);
+  },
+  {
+    name: "summarize_document",
+    description:
+      "Summarize a document, or a specific page range within it (e.g. one chapter/section). Use this " +
+      "instead of search_documents when the user wants an overview rather than an answer to a specific " +
+      "question — search_documents finds relevant snippets, this produces coherent coverage of the whole " +
+      "requested scope.",
+    schema: z.object({
+      documentId: z.string().describe("The document to summarize"),
+      pageStart: z.number().int().optional().describe("First page of the range to summarize; omit for the whole document"),
+      pageEnd: z.number().int().optional().describe("Last page of the range to summarize; omit for the whole document"),
+    }),
+  },
+);
+
 export function getTools() {
-  return [getCurrentTime, randomNumber, webSearch, sendEmail, runCode, generateImageTool];
+  return [
+    getCurrentTime,
+    randomNumber,
+    webSearch,
+    sendEmail,
+    runCode,
+    generateImageTool,
+    searchDocuments,
+    summarizeDocument,
+  ];
 }
 
 /** Tools that must not run without explicit user approval. */

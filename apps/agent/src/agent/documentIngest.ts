@@ -13,10 +13,12 @@
 import { cleanupConversion, convertDocument } from "./docling.js";
 import { chunkDocument, estimateTokens, fullText, pageCount } from "./documentChunker.js";
 import { embed } from "./embeddings.js";
+import { precomputeSummary } from "./documentSummarize.js";
 import { config } from "../config.js";
 import {
   type DocumentRecord,
   type SizeClass,
+  getDocumentRecord,
   insertChunks,
   insertDocument,
   markDocumentFailed,
@@ -79,6 +81,9 @@ async function runIngestPipeline(id: string, url: string): Promise<void> {
       fullText: sizeClass === "small" ? whole : null,
       status: "ready",
     });
+
+    const record = getDocumentRecord(id);
+    if (record) void precomputeSummary(record);
   } finally {
     await cleanupConversion(id);
   }
