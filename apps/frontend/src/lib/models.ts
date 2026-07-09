@@ -30,6 +30,3 @@ export function acceptFor(model: ModelInfo | undefined): string {
   return accept.join(",");
 }
 
-export function canAttach(model: ModelInfo | undefined): boolean {
-  return !!model && (model.modalities.includes("image") || model.modalities.includes("audio"));
-}

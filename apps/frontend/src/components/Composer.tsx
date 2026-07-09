@@ -4,7 +4,9 @@ import { ArrowUpIcon, PaperClipIcon, StopIcon, XMarkIcon } from "@heroicons/reac
 import { ModelSelector } from "./ModelSelector";
 import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../store/chat";
-import { acceptFor, canAttach } from "../lib/models";
+import { acceptFor } from "../lib/models";
+import { uploadFile } from "../lib/upload";
+import { DOCUMENT_ACCEPT, isDocumentFile, registerDocument } from "../lib/documents";
 
 interface PendingAttachment {
   file: File;
@@ -17,13 +19,30 @@ export function Composer() {
   const selectedName = useChatStore((s) => s.selectedModel);
   const models = useChatStore((s) => s.models);
   const model = models.find((m) => m.name === selectedName);
-  const attachable = canAttach(model);
 
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // Documents skip the lazy upload-on-send flow images/audio use — ingestion is
+  // async server-side work, so it starts the moment the file is picked and shows
+  // up as a chip in ActiveDocuments while it processes.
+  async function handleDocumentFile(file: File) {
+    try {
+      const uploaded = await uploadFile(file);
+      const doc = await registerDocument({
+        url: uploaded.url,
+        filename: file.name,
+        mimetype: uploaded.mimetype,
+        size: uploaded.size,
+      });
+      useChatStore.getState().addActiveDocument(doc.id);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : `Couldn't upload "${file.name}".`);
+    }
+  }
 
   function removeAttachment(index: number) {
     setAttachments((prev) => {
@@ -85,10 +104,9 @@ export function Composer() {
       <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2.5 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
         <button
           type="button"
-          aria-label={attachable ? "Add attachment" : "This model can't accept file uploads"}
-          disabled={!attachable}
+          aria-label="Add attachment"
           onClick={() => fileInput.current?.click()}
-          className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
         >
           <PaperClipIcon className="size-5" />
         </button>
@@ -96,11 +114,16 @@ export function Composer() {
           ref={fileInput}
           type="file"
           multiple
-          accept={acceptFor(model)}
+          accept={[acceptFor(model), DOCUMENT_ACCEPT].filter(Boolean).join(",")}
           onChange={(e) => {
             const picked = Array.from(e.target.files ?? []);
-            if (picked.length) {
-              const next = picked.map((file) => ({
+            const documentFiles = picked.filter(isDocumentFile);
+            const otherFiles = picked.filter((f) => !isDocumentFile(f));
+
+            for (const file of documentFiles) void handleDocumentFile(file);
+
+            if (otherFiles.length) {
+              const next = otherFiles.map((file) => ({
                 file,
                 previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
               }));

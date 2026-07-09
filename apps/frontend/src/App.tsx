@@ -4,11 +4,13 @@
  * that becomes a streaming conversation once you send a message.
  */
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { ClockIcon, Cog6ToothIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, Cog6ToothIcon, DocumentTextIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { useChatStore } from "./store/chat";
 import { fetchModels } from "./lib/models";
+import { ActiveDocuments } from "./components/ActiveDocuments";
 import { Composer } from "./components/Composer";
 import { Conversation } from "./components/Conversation";
+import { DocumentsPanel } from "./components/DocumentsPanel";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { useConversationRouting } from "./hooks/useConversationRouting";
@@ -24,6 +26,8 @@ function App() {
   const hasChat = turns.length > 0;
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
+  const documentsButtonRef = useRef<HTMLButtonElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -52,6 +56,14 @@ function App() {
         historyOpen={historyOpen}
         onToggleHistory={() => {
           setHistoryOpen((v) => !v);
+          setDocumentsOpen(false);
+          setSettingsOpen(false);
+        }}
+        documentsButtonRef={documentsButtonRef}
+        documentsOpen={documentsOpen}
+        onToggleDocuments={() => {
+          setDocumentsOpen((v) => !v);
+          setHistoryOpen(false);
           setSettingsOpen(false);
         }}
         settingsButtonRef={settingsButtonRef}
@@ -59,12 +71,18 @@ function App() {
         onToggleSettings={() => {
           setSettingsOpen((v) => !v);
           setHistoryOpen(false);
+          setDocumentsOpen(false);
         }}
       />
       <HistoryPanel
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         triggerRef={historyButtonRef}
+      />
+      <DocumentsPanel
+        open={documentsOpen}
+        onClose={() => setDocumentsOpen(false)}
+        triggerRef={documentsButtonRef}
       />
       <SettingsPanel
         open={settingsOpen}
@@ -77,6 +95,7 @@ function App() {
           <>
             <Conversation />
             <div className="shrink-0 pt-2 pb-6">
+              <ActiveDocuments />
               <Composer />
               <ErrorNote message={modelsError} />
             </div>
@@ -89,6 +108,7 @@ function App() {
                 let&apos;s get started
               </span>
             </h1>
+            <ActiveDocuments />
             <Composer />
             <ErrorNote message={modelsError} />
           </div>
@@ -124,6 +144,9 @@ function Sidebar({
   historyButtonRef,
   historyOpen,
   onToggleHistory,
+  documentsButtonRef,
+  documentsOpen,
+  onToggleDocuments,
   settingsButtonRef,
   settingsOpen,
   onToggleSettings,
@@ -132,6 +155,9 @@ function Sidebar({
   historyButtonRef: React.RefObject<HTMLButtonElement | null>;
   historyOpen: boolean;
   onToggleHistory: () => void;
+  documentsButtonRef: React.RefObject<HTMLButtonElement | null>;
+  documentsOpen: boolean;
+  onToggleDocuments: () => void;
   settingsButtonRef: React.RefObject<HTMLButtonElement | null>;
   settingsOpen: boolean;
   onToggleSettings: () => void;
@@ -149,6 +175,14 @@ function Sidebar({
           active={historyOpen}
         >
           <ClockIcon className="size-5" />
+        </RailButton>
+        <RailButton
+          ref={documentsButtonRef}
+          label="Documents"
+          onClick={onToggleDocuments}
+          active={documentsOpen}
+        >
+          <DocumentTextIcon className="size-5" />
         </RailButton>
       </div>
 

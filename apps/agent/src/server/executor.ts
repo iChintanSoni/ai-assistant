@@ -7,7 +7,8 @@ import { runAgentToEvents, type HITLRequestValue } from "./streaming.js";
 import type { ApprovalRequest, Envelope } from "./envelope.js";
 import { buildAgent } from "../agent/deepAgent.js";
 import { describeModel } from "../agent/models.js";
-import { extractModel, toLangChainContent, validateParts } from "../agent/parts.js";
+import { extractDocumentIds, extractModel, prependNote, toLangChainContent, validateParts } from "../agent/parts.js";
+import { getDocumentsByIds } from "../agent/documentStore.js";
 import { config } from "../config.js";
 
 interface RunRecord {
@@ -24,6 +25,28 @@ function extractDecisions(message: Message): unknown[] | null {
     }
   }
   return null;
+}
+
+/**
+ * Builds the human-message content for a fresh turn, prepending a note listing
+ * which documents are active in this conversation (if any) so the model has
+ * their IDs available to pass into search_documents/summarize_document —
+ * the same instruction+tool-call pattern /memories/ already uses, rather than
+ * deep-wiring document scope into the tool-call plumbing itself.
+ */
+async function buildTurnContent(userMessage: Message) {
+  const content = await toLangChainContent(userMessage.parts);
+  const documentIds = extractDocumentIds(userMessage);
+  if (documentIds.length === 0) return content;
+
+  const docs = getDocumentsByIds(documentIds);
+  if (docs.length === 0) return content;
+
+  const note =
+    "Active documents for this conversation (pass these IDs to search_documents/summarize_document/" +
+    "view_document_page when relevant):\n" +
+    docs.map((d) => `- ${d.originalName} (id: ${d.id})`).join("\n");
+  return prependNote(content, note);
 }
 
 /** Turn a HITL interrupt into an `approval` envelope for the client. */
@@ -74,7 +97,7 @@ export class DeepAgentExecutor implements AgentExecutor {
       const agent = await buildAgent(modelName);
       const input = isResume
         ? new Command({ resume: { decisions } })
-        : { messages: [{ role: "user", content: await toLangChainContent(userMessage.parts) }] };
+        : { messages: [{ role: "user", content: await buildTurnContent(userMessage) }] };
 
       const { finalText, interrupt } = await runAgentToEvents({
         agent,

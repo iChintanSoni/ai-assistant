@@ -113,7 +113,10 @@ export function useChat() {
       role: "user",
       messageId: crypto.randomUUID(),
       parts,
-      metadata: { model },
+      metadata: {
+        model,
+        ...(store.activeDocumentIds.length > 0 ? { documentIds: store.activeDocumentIds } : {}),
+      },
       ...(store.contextId ? { contextId: store.contextId } : {}),
     });
   }, []);

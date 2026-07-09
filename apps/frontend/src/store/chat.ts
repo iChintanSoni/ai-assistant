@@ -42,12 +42,16 @@ interface ChatState {
   pendingTaskId: string | null;
   isStreaming: boolean;
   turns: UITurn[];
+  /** Documents active in the current conversation — passed as tool-scope hints on send. */
+  activeDocumentIds: string[];
 
   setModels: (models: ModelInfo[], defaultModel: string) => void;
   setModelsError: (message: string) => void;
   selectModel: (name: string) => void;
   newChat: () => void;
   loadConversation: (id: string, model: string, turns: UITurn[]) => void;
+  addActiveDocument: (id: string) => void;
+  removeActiveDocument: (id: string) => void;
   beginTurn: (userText: string, attachments: UIAttachment[]) => void;
   setActiveTask: (taskId: string, contextId: string) => void;
   applyEnvelope: (env: Envelope) => void;
@@ -94,6 +98,7 @@ export const useChatStore = create<ChatState>((set) => ({
   pendingTaskId: null,
   isStreaming: false,
   turns: [],
+  activeDocumentIds: [],
 
   setModels: (models, defaultModel) =>
     set((s) => ({
@@ -112,7 +117,14 @@ export const useChatStore = create<ChatState>((set) => ({
   selectModel: (name) => set({ selectedModel: name }),
 
   newChat: () =>
-    set({ turns: [], contextId: null, activeTaskId: null, pendingTaskId: null, isStreaming: false }),
+    set({
+      turns: [],
+      contextId: null,
+      activeTaskId: null,
+      pendingTaskId: null,
+      isStreaming: false,
+      activeDocumentIds: [],
+    }),
 
   loadConversation: (id, model, turns) =>
     set({
@@ -122,7 +134,13 @@ export const useChatStore = create<ChatState>((set) => ({
       activeTaskId: null,
       pendingTaskId: null,
       isStreaming: false,
+      activeDocumentIds: [],
     }),
+
+  addActiveDocument: (id) =>
+    set((s) => (s.activeDocumentIds.includes(id) ? s : { activeDocumentIds: [...s.activeDocumentIds, id] })),
+
+  removeActiveDocument: (id) => set((s) => ({ activeDocumentIds: s.activeDocumentIds.filter((d) => d !== id) })),
 
   beginTurn: (userText, attachments) =>
     set((s) => ({

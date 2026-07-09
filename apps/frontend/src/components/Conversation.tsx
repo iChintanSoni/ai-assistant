@@ -4,6 +4,7 @@ import {
   CheckIcon,
   ChevronRightIcon,
   ClipboardDocumentIcon,
+  DocumentTextIcon,
   LightBulbIcon,
   PhotoIcon,
   ShieldExclamationIcon,
@@ -151,7 +152,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
   );
 }
 
-/** generate_image returns `{"url": "...", "prompt": "..."}` as a JSON string; anything else falls back to raw output. */
+/** generate_image / view_document_page return `{"url": "...", ...}` as a JSON string; anything else falls back to raw output. */
 function parseImageResult(output: unknown): { url: string } | null {
   if (typeof output !== "string") return null;
   try {
@@ -162,17 +163,59 @@ function parseImageResult(output: unknown): { url: string } | null {
   }
 }
 
+interface DocSearchHit {
+  documentId: string;
+  documentName: string;
+  page: string;
+  text: string;
+}
+
+/** search_documents returns a JSON array of excerpts; anything else falls back to raw output. */
+function parseSearchResults(output: unknown): DocSearchHit[] | null {
+  if (typeof output !== "string") return null;
+  try {
+    const parsed = JSON.parse(output) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (h): h is DocSearchHit =>
+        !!h && typeof h === "object" && typeof (h as DocSearchHit).documentName === "string" && typeof (h as DocSearchHit).text === "string",
+    );
+  } catch {
+    return null;
+  }
+}
+
 function extractPrompt(args: unknown): string | undefined {
   const prompt = args && typeof args === "object" ? (args as { prompt?: unknown }).prompt : undefined;
   return typeof prompt === "string" && prompt ? prompt : undefined;
 }
 
+function SourceCard({ hit }: { hit: DocSearchHit }) {
+  const isFigure = hit.text.startsWith("[Figure]");
+  const excerpt = isFigure ? hit.text.slice("[Figure]".length).trim() : hit.text;
+  return (
+    <div className="rounded-xl bg-white/70 p-2.5 ring-1 ring-slate-200/60 dark:bg-slate-950/50 dark:ring-slate-700/50">
+      <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+        {isFigure ? <PhotoIcon className="size-3.5 shrink-0" /> : <DocumentTextIcon className="size-3.5 shrink-0" />}
+        <span className="min-w-0 truncate font-medium text-slate-700 dark:text-slate-300">{hit.documentName}</span>
+        <span className="shrink-0">p.{hit.page}</span>
+      </div>
+      <p className="mt-1 line-clamp-4 text-slate-600 dark:text-slate-400">{excerpt}</p>
+    </div>
+  );
+}
+
 function ToolRow({ tool }: { tool: UIToolCall }) {
   const isImageGen = tool.name === "generate_image";
-  const [open, setOpen] = useState(isImageGen);
+  const isViewPage = tool.name === "view_document_page";
+  const isSearchDocs = tool.name === "search_documents";
+  const isSummarize = tool.name === "summarize_document";
+  const [open, setOpen] = useState(isImageGen || isViewPage || isSearchDocs || isSummarize);
   const running = tool.status === "started";
-  const image = tool.status === "completed" ? parseImageResult(tool.output) : null;
-  const Icon = isImageGen ? PhotoIcon : WrenchScrewdriverIcon;
+  const image = tool.status === "completed" && (isImageGen || isViewPage) ? parseImageResult(tool.output) : null;
+  const searchHits = tool.status === "completed" && isSearchDocs ? parseSearchResults(tool.output) : null;
+  const Icon = isImageGen || isViewPage ? PhotoIcon : isSearchDocs ? WrenchScrewdriverIcon : DocumentTextIcon;
+  const isDocTool = isImageGen || isViewPage || isSearchDocs || isSummarize;
 
   return (
     <div className="rounded-2xl bg-slate-50/70 p-3 ring-1 ring-slate-200/60 dark:bg-slate-900/60 dark:ring-slate-700/50">
@@ -192,12 +235,12 @@ function ToolRow({ tool }: { tool: UIToolCall }) {
       </button>
       {open && (
         <div className="mt-2 flex flex-col gap-2 text-xs">
-          {!isImageGen && tool.args !== undefined && (
+          {!isDocTool && tool.args !== undefined && (
             <pre className="overflow-x-auto rounded-lg bg-white/70 p-2 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
               {fmt(tool.args)}
             </pre>
           )}
-          {isImageGen && running && (
+          {(isImageGen || isViewPage) && running && (
             <div
               aria-hidden="true"
               className="flex h-48 w-full animate-pulse items-center justify-center rounded-2xl bg-slate-100/80 ring-1 ring-slate-200/60 dark:bg-slate-800/80 dark:ring-slate-700/50"
@@ -205,19 +248,31 @@ function ToolRow({ tool }: { tool: UIToolCall }) {
               <PhotoIcon className="size-8 text-slate-300 dark:text-slate-600" />
             </div>
           )}
-          {isImageGen && image && (
+          {(isImageGen || isViewPage) && image && (
             <>
               <img
                 src={image.url}
-                alt={extractPrompt(tool.args) ?? "Generated image"}
+                alt={extractPrompt(tool.args) ?? "Document page"}
                 className="max-h-105 w-full rounded-2xl bg-slate-100/60 object-contain ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/60"
               />
-              {extractPrompt(tool.args) && (
+              {isImageGen && extractPrompt(tool.args) && (
                 <p className="px-1 text-xs text-slate-400 italic dark:text-slate-500">{extractPrompt(tool.args)}</p>
               )}
             </>
           )}
-          {(!isImageGen || (tool.status === "completed" && !image)) && tool.output !== undefined && (
+          {isSearchDocs && searchHits && searchHits.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {searchHits.map((hit, i) => (
+                <SourceCard key={`${hit.documentId}-${i}`} hit={hit} />
+              ))}
+            </div>
+          )}
+          {isSummarize && tool.status === "completed" && typeof tool.output === "string" && (
+            <div className="rounded-xl bg-white/70 p-2.5 text-slate-700 ring-1 ring-slate-200/60 dark:bg-slate-950/50 dark:text-slate-300 dark:ring-slate-700/50">
+              <Markdown text={tool.output} />
+            </div>
+          )}
+          {!isDocTool && (!isImageGen || (tool.status === "completed" && !image)) && tool.output !== undefined && (
             <pre className="overflow-x-auto rounded-lg bg-white/70 p-2 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
               {fmt(tool.output)}
             </pre>

@@ -8,6 +8,12 @@ export function extractModel(message: Message): string | undefined {
   return typeof model === "string" && model.length > 0 ? model : undefined;
 }
 
+/** Documents active in this conversation are passed in metadata: { documentIds: [...] }. */
+export function extractDocumentIds(message: Message): string[] {
+  const ids = message.metadata?.["documentIds"];
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+}
+
 function fileModality(mimeType: string | undefined): Modality | "other" {
   if (!mimeType) return "other";
   if (mimeType.startsWith("image/")) return "image";
@@ -71,6 +77,12 @@ export async function toLangChainContent(parts: Part[]): Promise<string | Conten
   // Collapse to a plain string when it's a single text block (nicer for text models).
   if (blocks.length === 1 && blocks[0]?.type === "text") return blocks[0].text;
   return blocks;
+}
+
+/** Prepends a text note (e.g. which documents are active) to already-built message content. */
+export function prependNote(content: string | ContentBlock[], note: string): string | ContentBlock[] {
+  if (typeof content === "string") return `${note}\n\n${content}`;
+  return [{ type: "text", text: note }, ...content];
 }
 
 void fileModality; // reserved for future document handling
