@@ -1,0 +1,33 @@
+{
+  "name": "file-storage",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone file upload/serve service used by the agent to publish generated artifacts (e.g. images)",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch --import tsx src/index.ts",
+    "start": "node --env-file-if-exists=.env --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "file-type": "^22.0.1",
+    "multer": "^2.1.1",
+    "uuid": "^14.0.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^24.13.2",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  }
+}

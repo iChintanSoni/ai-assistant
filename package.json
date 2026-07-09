@@ -1,0 +1,26 @@
+{
+  "name": "ai-assistant",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently -k -n agent,web,files -c blue,magenta,green \"npm:dev:agent\" \"npm:dev:web\" \"npm:dev:files\"",
+    "dev:agent": "npm run dev -w agent",
+    "dev:web": "npm run dev -w frontend",
+    "dev:files": "npm run dev -w file-storage",
+    "typecheck": "npm run typecheck -w agent && npm run typecheck -w frontend && npm run typecheck -w file-storage",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "workspaces": [
+    "apps/frontend",
+    "apps/agent",
+    "apps/file-storage"
+  ],
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}
