@@ -4,16 +4,19 @@ import { ArrowUpIcon, PaperClipIcon, StopIcon, XMarkIcon } from "@heroicons/reac
 import { ModelSelector } from "./ModelSelector";
 import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../store/chat";
+import type { PendingAttachment } from "../hooks/useAttachments";
 import { acceptFor } from "../lib/models";
-import { uploadFile } from "../lib/upload";
-import { DOCUMENT_ACCEPT, isDocumentFile, registerDocument } from "../lib/documents";
+import { DOCUMENT_ACCEPT } from "../lib/documents";
 
-interface PendingAttachment {
-  file: File;
-  previewUrl?: string;
+interface ComposerProps {
+  attachments: PendingAttachment[];
+  notice: string | null;
+  addFiles: (files: File[]) => void;
+  removeAttachment: (index: number) => void;
+  clear: () => void;
 }
 
-export function Composer() {
+export function Composer({ attachments, notice, addFiles, removeAttachment, clear }: ComposerProps) {
   const { send, stop } = useChat();
   const isStreaming = useChatStore((s) => s.isStreaming);
   const selectedName = useChatStore((s) => s.selectedModel);
@@ -21,36 +24,9 @@ export function Composer() {
   const model = models.find((m) => m.name === selectedName);
 
   const [text, setText] = useState("");
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  // Documents skip the lazy upload-on-send flow images/audio use — ingestion is
-  // async server-side work, so it starts the moment the file is picked and shows
-  // up as a chip in ActiveDocuments while it processes.
-  async function handleDocumentFile(file: File) {
-    try {
-      const uploaded = await uploadFile(file);
-      const doc = await registerDocument({
-        url: uploaded.url,
-        filename: file.name,
-        mimetype: uploaded.mimetype,
-        size: uploaded.size,
-      });
-      useChatStore.getState().addActiveDocument(doc.id);
-    } catch (err) {
-      setSendError(err instanceof Error ? err.message : `Couldn't upload "${file.name}".`);
-    }
-  }
-
-  function removeAttachment(index: number) {
-    setAttachments((prev) => {
-      const target = prev[index];
-      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter((_, j) => j !== index);
-    });
-  }
 
   async function submit() {
     if (isStreaming || isSending) return;
@@ -63,9 +39,8 @@ export function Composer() {
       // Uploads happen inside send(); only clear the draft once it's actually sent,
       // so a failed upload (e.g. file-storage unreachable) doesn't lose the user's input.
       await send(t, f);
-      for (const a of attachments) if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+      clear();
       setText("");
-      setAttachments([]);
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Couldn't send that. Try again.");
     } finally {
@@ -116,19 +91,7 @@ export function Composer() {
           multiple
           accept={[acceptFor(model), DOCUMENT_ACCEPT].filter(Boolean).join(",")}
           onChange={(e) => {
-            const picked = Array.from(e.target.files ?? []);
-            const documentFiles = picked.filter(isDocumentFile);
-            const otherFiles = picked.filter((f) => !isDocumentFile(f));
-
-            for (const file of documentFiles) void handleDocumentFile(file);
-
-            if (otherFiles.length) {
-              const next = otherFiles.map((file) => ({
-                file,
-                previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
-              }));
-              setAttachments((prev) => [...prev, ...next]);
-            }
+            addFiles(Array.from(e.target.files ?? []));
             e.target.value = "";
           }}
           className="hidden"
@@ -173,8 +136,10 @@ export function Composer() {
         )}
       </div>
 
-      {sendError && (
-        <p className="mx-auto mt-3 max-w-2xl px-3 text-center text-sm text-rose-500 dark:text-rose-400">{sendError}</p>
+      {(sendError || notice) && (
+        <p className="mx-auto mt-3 max-w-2xl px-3 text-center text-sm text-rose-500 dark:text-rose-400">
+          {sendError || notice}
+        </p>
       )}
     </div>
   );

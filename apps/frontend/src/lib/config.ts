@@ -6,3 +6,6 @@ export const AGENT_URL = env.VITE_AGENT_URL?.replace(/\/$/, "") || "http://local
 /** Where attachments are uploaded before a message references them by URL. */
 export const FILE_STORAGE_URL =
   env.VITE_FILE_STORAGE_URL?.replace(/\/$/, "") || "http://localhost:6060";
+
+/** Max files simultaneously attached/active for a conversation (documents + other attachments combined). */
+export const MAX_ATTACHMENTS = 5;

@@ -114,8 +114,98 @@ test("pageCount returns the highest page number present", () => {
   assert.equal(pageCount(makeDoc()), 2);
 });
 
-test("chunkDocument returns nothing for a document with no body children", () => {
+test("chunkDocument returns nothing for a genuinely empty document", () => {
   const doc = makeDoc();
   doc.body.children = [];
+  doc.texts = [];
+  doc.tables = [];
   assert.deepEqual(chunkDocument(doc, 500), []);
+});
+
+test("chunkDocument still recovers texts/tables via the orphan fallback when body.children is empty", () => {
+  // Distinguishes "empty document" (asserted above) from "body.children just
+  // doesn't link anything" (the real Docling bug this fallback exists for).
+  const doc = makeDoc();
+  doc.body.children = [];
+  assert.equal(chunkDocument(doc, 500).length > 0, true);
+});
+
+/**
+ * Shaped after a real `docling sample.html --to json` run: HTML has no page
+ * concept, so every text/table item's `prov` is an empty array (not just
+ * missing page_no) and `pages` is `{}` entirely, unlike a paginated PDF/DOCX.
+ */
+function makeUnpaginatedDoc(): DoclingDocument {
+  return {
+    schema_name: "DoclingDocument",
+    texts: [
+      { self_ref: "#/texts/0", label: "title", text: "Section One", prov: [] },
+      { self_ref: "#/texts/1", label: "text", text: "Body text with no page provenance.", prov: [] },
+    ],
+    tables: [],
+    pictures: [],
+    groups: [],
+    body: { self_ref: "#/body", children: [{ $ref: "#/texts/0" }, { $ref: "#/texts/1" }] },
+    pages: {},
+  };
+}
+
+test("chunkDocument defaults to page 1 for elements with empty provenance (HTML-shaped input)", () => {
+  const chunks = chunkDocument(makeUnpaginatedDoc(), 500);
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0]!.pageStart, 1);
+  assert.equal(chunks[0]!.pageEnd, 1);
+});
+
+test("pageCount defaults to 1 for a document with an empty pages map (HTML-shaped input)", () => {
+  assert.equal(pageCount(makeUnpaginatedDoc()), 1);
+});
+
+/**
+ * Shaped after a real `docling` run on HTML/DOCX with a leading heading: the
+ * heading is the only entry in body.children, and the paragraph + table that
+ * follow exist in texts[]/tables[] but aren't referenced by body.children or
+ * any group — confirmed Docling 2.36.1 behavior, not a hypothetical.
+ */
+function makeOrphanedContentDoc(): DoclingDocument {
+  return {
+    schema_name: "DoclingDocument",
+    texts: [
+      { self_ref: "#/texts/0", label: "title", text: "Heading", prov: [] },
+      { self_ref: "#/texts/1", label: "text", text: "Orphaned paragraph.", prov: [] },
+    ],
+    tables: [
+      {
+        self_ref: "#/tables/0",
+        label: "table",
+        prov: [],
+        data: {
+          table_cells: [
+            {
+              text: "cell",
+              row_span: 1,
+              col_span: 1,
+              start_row_offset_idx: 0,
+              end_row_offset_idx: 1,
+              start_col_offset_idx: 0,
+              end_col_offset_idx: 1,
+              column_header: true,
+              row_header: false,
+            },
+          ],
+        },
+      },
+    ],
+    pictures: [],
+    groups: [],
+    body: { self_ref: "#/body", children: [{ $ref: "#/texts/0" }] }, // only the heading is linked
+    pages: {},
+  };
+}
+
+test("chunkDocument recovers text/table content orphaned from body.children instead of dropping it", () => {
+  const text = fullText(makeOrphanedContentDoc());
+  assert.match(text, /Heading/);
+  assert.match(text, /Orphaned paragraph/);
+  assert.match(text, /cell/);
 });

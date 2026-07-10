@@ -2,11 +2,13 @@
 import { buildApp } from "./server/app.js";
 import { startFileCleanup } from "./agent/fileCleanup.js";
 import { reconcileStuckDocuments } from "./agent/documentIngest.js";
+import { backfillAttachmentsIndex } from "./agent/attachmentsStore.js";
 import { config } from "./config.js";
 
 const app = buildApp();
 startFileCleanup();
 reconcileStuckDocuments();
+backfillAttachmentsIndex();
 
 const server = app.listen(config.port, () => {
   console.log(`[agent] Aurora A2A server listening on ${config.publicUrl}`);

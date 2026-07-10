@@ -65,9 +65,38 @@ function tableToMarkdown(cells: DoclingTableCell[]): string {
   return lines.join("\n");
 }
 
-/** Flatten body.children (recursing through groups) into leaf text/table elements in reading order. */
+/**
+ * Flatten body.children (recursing through groups) into leaf text/table
+ * elements in reading order.
+ *
+ * Docling's HTML and DOCX backends have a confirmed quirk (checked against
+ * 2.36.1): when the first body element is a heading/title, everything after
+ * it can end up present in texts[]/tables[] but never linked into
+ * body.children or any group — silently dropping the rest of the document
+ * from search/chunking. The second pass below is a best-effort recovery for
+ * that: any leaf never reached by the body/group walk gets appended in its
+ * own array's order. Interleaving between recovered texts and tables won't
+ * always match true reading order, but that's strictly better than losing
+ * the content outright, and it's a no-op for the common case (PDFs, and any
+ * HTML/DOCX without a leading heading) where body.children already covers
+ * everything.
+ */
 function flatten(doc: DoclingDocument): FlatElement[] {
   const out: FlatElement[] = [];
+  const visited = new Set<string>();
+
+  function pushText(item: import("./docling.js").DoclingTextItem): void {
+    if (visited.has(item.self_ref) || !item.text?.trim()) return;
+    visited.add(item.self_ref);
+    out.push({ kind: "text", label: item.label, page: item.prov[0]?.page_no ?? 1, text: item.text.trim() });
+  }
+
+  function pushTable(item: import("./docling.js").DoclingTableItem): void {
+    if (visited.has(item.self_ref)) return;
+    visited.add(item.self_ref);
+    const md = tableToMarkdown(item.data.table_cells);
+    if (md) out.push({ kind: "table", label: "table", page: item.prov[0]?.page_no ?? 1, text: md });
+  }
 
   function visit(children: { $ref: string }[]): void {
     for (const { $ref } of children) {
@@ -79,13 +108,10 @@ function flatten(doc: DoclingDocument): FlatElement[] {
       }
       if (kind === "texts") {
         const item = resolveRef(doc, $ref) as import("./docling.js").DoclingTextItem | undefined;
-        if (!item?.text?.trim()) continue;
-        out.push({ kind: "text", label: item.label, page: item.prov[0]?.page_no ?? 1, text: item.text.trim() });
+        if (item) pushText(item);
       } else if (kind === "tables") {
         const item = resolveRef(doc, $ref) as import("./docling.js").DoclingTableItem | undefined;
-        if (!item) continue;
-        const md = tableToMarkdown(item.data.table_cells);
-        if (md) out.push({ kind: "table", label: "table", page: item.prov[0]?.page_no ?? 1, text: md });
+        if (item) pushTable(item);
       }
       void idxStr;
       // pictures are intentionally skipped here — handled by the figure-captioning ingest step.
@@ -93,6 +119,8 @@ function flatten(doc: DoclingDocument): FlatElement[] {
   }
 
   visit(doc.body.children);
+  for (const item of doc.texts) pushText(item);
+  for (const item of doc.tables) pushTable(item);
   return out;
 }
 

@@ -9,13 +9,24 @@ import { listModels } from "../agent/models.js";
 import {
   deleteConversation,
   getConversation,
+  getConversationTitlesByIds,
   listConversations,
+  listConversationsReferencingDocument,
   upsertConversation,
   type HistoryTurn,
 } from "../agent/historyStore.js";
 import { deleteConversationFiles } from "../agent/fileCleanup.js";
 import { ingestDocument } from "../agent/documentIngest.js";
-import { deleteDocumentRecord, getChunksForDocument, getDocumentRecord, listDocuments } from "../agent/documentStore.js";
+import { deleteDocumentRecord, getChunksForDocument, getDocumentRecord, getDocumentsByIds, listDocuments } from "../agent/documentStore.js";
+import {
+  deleteAttachment,
+  deleteAttachmentForDocument,
+  deleteAttachmentsForConversation,
+  getAttachment,
+  listAttachments,
+  syncFromTurns,
+  upsertAttachment,
+} from "../agent/attachmentsStore.js";
 import { config } from "../config.js";
 
 export function buildApp(): express.Express {
@@ -63,12 +74,14 @@ export function buildApp(): express.Express {
       return;
     }
     upsertConversation(req.params.id, model, turns as HistoryTurn[]);
+    syncFromTurns(req.params.id, turns as HistoryTurn[]);
     res.status(204).end();
   });
 
   app.delete("/conversations/:id", (req, res) => {
     const existing = getConversation(req.params.id);
     deleteConversation(req.params.id);
+    deleteAttachmentsForConversation(req.params.id);
     res.status(204).end();
     if (existing) void deleteConversationFiles(existing.turns);
   });
@@ -92,6 +105,17 @@ export function buildApp(): express.Express {
       mimeType: mimetype,
       size: typeof size === "number" ? size : 0,
       fileStorageFilename: url.split("/").pop() ?? filename,
+    });
+    upsertAttachment({
+      fileStorageFilename: record.fileStorageFilename,
+      url,
+      originalName: record.originalName,
+      mimeType: record.mimeType,
+      size: record.size,
+      kind: "document",
+      documentId: record.id,
+      conversationId: null,
+      createdAt: record.createdAt,
     });
     res.status(201).json(record);
   });
@@ -127,12 +151,77 @@ export function buildApp(): express.Express {
     }
 
     deleteDocumentRecord(req.params.id);
+    deleteAttachmentForDocument(req.params.id);
     res.status(204).end();
     await Promise.allSettled(
       [...filenames].map((filename) =>
         fetch(`${config.fileStorageBaseUrl}/files/${encodeURIComponent(filename)}`, { method: "DELETE" }),
       ),
     );
+  });
+
+  // Files gallery — unified view over documents, plain attachments, and
+  // generated images (see attachmentsStore.ts for how each kind gets indexed).
+  app.get("/attachments", (_req, res) => {
+    const records = listAttachments();
+
+    const conversationIds = new Set<string>();
+    const documentIds: string[] = [];
+    for (const r of records) {
+      if (r.conversationId) conversationIds.add(r.conversationId);
+      if (r.kind === "document" && r.documentId) documentIds.push(r.documentId);
+    }
+    const titles = getConversationTitlesByIds([...conversationIds]);
+    const docs = new Map(getDocumentsByIds(documentIds).map((d) => [d.id, d]));
+
+    const attachments = records.map((r) => {
+      const usedIn =
+        r.kind === "document" && r.documentId
+          ? listConversationsReferencingDocument(r.documentId)
+          : r.conversationId && titles.has(r.conversationId)
+            ? [{ id: r.conversationId, title: titles.get(r.conversationId)! }]
+            : [];
+      const doc = r.kind === "document" && r.documentId ? docs.get(r.documentId) : undefined;
+
+      return {
+        id: r.id,
+        url: r.url,
+        originalName: r.originalName,
+        mimeType: r.mimeType,
+        size: r.size,
+        kind: r.kind,
+        createdAt: r.createdAt,
+        usedIn,
+        ...(doc
+          ? {
+              documentId: doc.id,
+              status: doc.status,
+              summaryStatus: doc.summaryStatus,
+              pageCount: doc.pageCount,
+              error: doc.error,
+            }
+          : {}),
+      };
+    });
+
+    res.json({ attachments });
+  });
+
+  app.delete("/attachments/:id", async (req, res) => {
+    const record = getAttachment(req.params.id);
+    if (!record) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (record.kind === "document") {
+      res.status(400).json({ error: "Delete documents via DELETE /documents/:id" });
+      return;
+    }
+    deleteAttachment(record.id);
+    res.status(204).end();
+    await fetch(`${config.fileStorageBaseUrl}/files/${encodeURIComponent(record.fileStorageFilename)}`, {
+      method: "DELETE",
+    }).catch(() => {});
   });
 
   // A2A surface.

@@ -13,8 +13,16 @@ export interface UIToolCall {
   status: "started" | "completed" | "error";
 }
 
-/** previewUrl is only set for image attachments: a file-storage URL, persisted as-is in history. */
+/** A file-storage URL, persisted as-is in history so it stays navigable across reloads. */
 export interface UIAttachment {
+  name: string;
+  url: string;
+  mimeType: string;
+  size: number;
+}
+
+/** Pre-fix persisted shape: only images had a URL (as `previewUrl`); other kinds are unrecoverable. */
+export interface LegacyUIAttachment {
   name: string;
   previewUrl?: string;
 }
@@ -27,8 +35,10 @@ export interface UITurn {
   tools: UIToolCall[];
   status: TurnStatus;
   error?: string;
-  /** Legacy persisted conversations stored these as plain filename strings. */
-  attachments?: (UIAttachment | string)[];
+  /** Legacy persisted conversations stored these as plain filename strings or the pre-fix shape above. */
+  attachments?: (UIAttachment | LegacyUIAttachment | string)[];
+  /** Document library ids active when this (user) turn was sent — used to trace a document back to the chats that used it. */
+  documentIds?: string[];
   approvals?: ApprovalRequest[];
   subagents?: UIToolCall[];
 }
@@ -52,7 +62,7 @@ interface ChatState {
   loadConversation: (id: string, model: string, turns: UITurn[]) => void;
   addActiveDocument: (id: string) => void;
   removeActiveDocument: (id: string) => void;
-  beginTurn: (userText: string, attachments: UIAttachment[]) => void;
+  beginTurn: (userText: string, attachments: UIAttachment[], documentIds: string[]) => void;
   setActiveTask: (taskId: string, contextId: string) => void;
   applyEnvelope: (env: Envelope) => void;
   finishTurn: (status: TurnStatus, finalText?: string, error?: string) => void;
@@ -142,7 +152,7 @@ export const useChatStore = create<ChatState>((set) => ({
 
   removeActiveDocument: (id) => set((s) => ({ activeDocumentIds: s.activeDocumentIds.filter((d) => d !== id) })),
 
-  beginTurn: (userText, attachments) =>
+  beginTurn: (userText, attachments, documentIds) =>
     set((s) => ({
       isStreaming: true,
       turns: [
@@ -155,6 +165,7 @@ export const useChatStore = create<ChatState>((set) => ({
           tools: [],
           status: "complete",
           attachments,
+          documentIds: documentIds.length > 0 ? documentIds : undefined,
         },
         {
           id: crypto.randomUUID(),

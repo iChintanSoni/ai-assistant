@@ -30,3 +30,16 @@ export function acceptFor(model: ModelInfo | undefined): string {
   return accept.join(",");
 }
 
+/**
+ * Real validation for a non-document file, gated by the model's modalities.
+ * Unlike a file <input>'s `accept` attribute (which only filters the OS
+ * dialog), a drag-and-drop DataTransfer can carry any file type, so the drop
+ * path needs this instead of relying on the browser to have filtered already.
+ */
+export function isAcceptableOtherFile(file: File, model: ModelInfo | undefined): boolean {
+  if (!model) return false;
+  if (model.modalities.includes("image") && file.type.startsWith("image/")) return true;
+  if (model.modalities.includes("audio") && file.type.startsWith("audio/")) return true;
+  return false;
+}
+

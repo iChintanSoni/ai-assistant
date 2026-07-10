@@ -15,7 +15,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { useChatStore } from "../store/chat";
-import type { UIAttachment, UIToolCall, UITurn } from "../store/chat";
+import type { LegacyUIAttachment, UIAttachment, UIToolCall, UITurn } from "../store/chat";
 import { useChat } from "../hooks/useChat";
 import type { ApprovalRequest, Decision } from "../lib/envelope";
 
@@ -374,9 +374,51 @@ function ApprovalCard({ requests }: { requests: ApprovalRequest[] }) {
   );
 }
 
-/** Older persisted conversations stored attachments as plain filename strings. */
-function normalizeAttachment(a: UIAttachment | string): UIAttachment {
-  return typeof a === "string" ? { name: a } : a;
+interface RenderableAttachment {
+  name: string;
+  url?: string;
+  isImage: boolean;
+}
+
+/**
+ * Legacy persisted conversations stored attachments as plain filename strings, or (pre-fix)
+ * only ever captured a URL for image attachments via `previewUrl` — non-image legacy
+ * attachments have no recoverable URL and render as inert text.
+ */
+function normalizeAttachment(a: UIAttachment | LegacyUIAttachment | string): RenderableAttachment {
+  if (typeof a === "string") return { name: a, isImage: false };
+  if ("mimeType" in a) return { name: a.name, url: a.url, isImage: a.mimeType.startsWith("image/") };
+  return { name: a.name, url: a.previewUrl, isImage: Boolean(a.previewUrl) };
+}
+
+/** Falls back to a muted "file removed" chip if the underlying file-storage object is gone. */
+function AttachmentImage({ name, url }: { name: string; url: string }) {
+  const [errored, setErrored] = useState(false);
+  if (errored) return <AttachmentChip name={`${name} (file removed)`} />;
+  return (
+    <img
+      src={url}
+      alt={name}
+      onError={() => setErrored(true)}
+      className="size-14 rounded-xl object-cover ring-1 ring-slate-200/60 dark:ring-slate-700/60"
+    />
+  );
+}
+
+function AttachmentChip({ name, href }: { name: string; href?: string }) {
+  const className =
+    "rounded-full bg-white/70 px-2 py-0.5 text-xs text-slate-500 ring-1 ring-slate-200/70 dark:bg-slate-950/50 dark:text-slate-400 dark:ring-slate-700/60";
+  if (!href) return <span className={className}>{name}</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={`${className} transition-colors hover:text-slate-700 dark:hover:text-slate-200`}
+    >
+      {name}
+    </a>
+  );
 }
 
 function UserTurn({ turn }: { turn: UITurn }) {
@@ -387,20 +429,10 @@ function UserTurn({ turn }: { turn: UITurn }) {
         {turn.attachments && turn.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {turn.attachments.map(normalizeAttachment).map((a, i) =>
-              a.previewUrl ? (
-                <img
-                  key={`${a.name}-${i}`}
-                  src={a.previewUrl}
-                  alt={a.name}
-                  className="size-14 rounded-xl object-cover ring-1 ring-slate-200/60 dark:ring-slate-700/60"
-                />
+              a.isImage && a.url ? (
+                <AttachmentImage key={`${a.name}-${i}`} name={a.name} url={a.url} />
               ) : (
-                <span
-                  key={`${a.name}-${i}`}
-                  className="rounded-full bg-white/70 px-2 py-0.5 text-xs text-slate-500 ring-1 ring-slate-200/70 dark:bg-slate-950/50 dark:text-slate-400 dark:ring-slate-700/60"
-                >
-                  {a.name}
-                </span>
+                <AttachmentChip key={`${a.name}-${i}`} name={a.name} href={a.url} />
               ),
             )}
           </div>

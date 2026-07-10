@@ -48,9 +48,10 @@ interface HistoryPanelProps {
   open: boolean;
   onClose: () => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
+  navigateToChat: () => void;
 }
 
-export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
+export function HistoryPanel({ open, onClose, triggerRef, navigateToChat }: HistoryPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -126,6 +127,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
     try {
       const detail = await getConversation(id);
       useChatStore.getState().loadConversation(detail.id, detail.model, detail.turns);
+      navigateToChat();
       close();
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));

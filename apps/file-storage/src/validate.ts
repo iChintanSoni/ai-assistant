@@ -8,10 +8,16 @@ import { fileTypeFromBuffer } from "file-type";
 
 const TEXT_SNIFF_BYTES = 8000;
 
+const ALLOWED_OFFICE_MIMES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+]);
+
 function isAllowedMime(mime: string): boolean {
   if (mime.startsWith("image/")) return mime !== "image/svg+xml"; // SVG can carry <script>
   if (mime.startsWith("audio/")) return true;
-  return mime === "application/pdf" || mime === "text/plain";
+  return mime === "application/pdf" || mime === "text/plain" || ALLOWED_OFFICE_MIMES.has(mime);
 }
 
 function looksLikeText(buffer: Buffer): boolean {

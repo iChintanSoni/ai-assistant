@@ -101,12 +101,14 @@ export function useChat() {
       } satisfies FilePart);
       attachments.push({
         name: f.name,
-        previewUrl: uploaded.mimetype.startsWith("image/") ? uploaded.url : undefined,
+        url: uploaded.url,
+        mimeType: uploaded.mimetype,
+        size: uploaded.size,
       });
     }
     if (parts.length === 0) return;
 
-    store.beginTurn(text, attachments);
+    store.beginTurn(text, attachments, store.activeDocumentIds);
 
     await streamMessage({
       kind: "message",

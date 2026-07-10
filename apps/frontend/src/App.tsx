@@ -4,16 +4,20 @@
  * that becomes a streaming conversation once you send a message.
  */
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { ClockIcon, Cog6ToothIcon, DocumentTextIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, Cog6ToothIcon, DocumentTextIcon, FolderIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { useChatStore } from "./store/chat";
 import { fetchModels } from "./lib/models";
 import { ActiveDocuments } from "./components/ActiveDocuments";
 import { Composer } from "./components/Composer";
 import { Conversation } from "./components/Conversation";
 import { DocumentsPanel } from "./components/DocumentsPanel";
+import { DropOverlay } from "./components/DropOverlay";
+import { FilesPage } from "./components/FilesPage";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { useAttachments } from "./hooks/useAttachments";
 import { useConversationRouting } from "./hooks/useConversationRouting";
+import { useFileDrop } from "./hooks/useFileDrop";
 
 const USER_NAME = "Chintan";
 
@@ -30,8 +34,10 @@ function App() {
   const documentsButtonRef = useRef<HTMLButtonElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const attachmentsState = useAttachments();
+  const { isDraggingFiles, dropZoneProps } = useFileDrop(attachmentsState.addFiles);
 
-  useConversationRouting();
+  const { view, navigateToFiles, navigateToChat } = useConversationRouting();
 
   useEffect(() => {
     let active = true;
@@ -51,7 +57,10 @@ function App() {
     <div className="relative flex h-screen w-screen overflow-hidden bg-white font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200">
       <AuroraGlow />
       <Sidebar
-        onNewChat={newChat}
+        onNewChat={() => {
+          newChat();
+          navigateToChat();
+        }}
         historyButtonRef={historyButtonRef}
         historyOpen={historyOpen}
         onToggleHistory={() => {
@@ -66,6 +75,13 @@ function App() {
           setHistoryOpen(false);
           setSettingsOpen(false);
         }}
+        filesOpen={view === "files"}
+        onOpenFiles={() => {
+          navigateToFiles();
+          setHistoryOpen(false);
+          setDocumentsOpen(false);
+          setSettingsOpen(false);
+        }}
         settingsButtonRef={settingsButtonRef}
         settingsOpen={settingsOpen}
         onToggleSettings={() => {
@@ -78,6 +94,7 @@ function App() {
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         triggerRef={historyButtonRef}
+        navigateToChat={navigateToChat}
       />
       <DocumentsPanel
         open={documentsOpen}
@@ -90,30 +107,37 @@ function App() {
         triggerRef={settingsButtonRef}
       />
 
-      <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-6">
-        {hasChat ? (
-          <>
-            <Conversation />
-            <div className="shrink-0 pt-2 pb-6">
+      {view === "files" ? (
+        <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-6">
+          <FilesPage navigateToChat={navigateToChat} />
+        </main>
+      ) : (
+        <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-6" {...dropZoneProps}>
+          <DropOverlay visible={isDraggingFiles} />
+          {hasChat ? (
+            <>
+              <Conversation />
+              <div className="shrink-0 pt-2 pb-6">
+                <ActiveDocuments />
+                <Composer {...attachmentsState} />
+                <ErrorNote message={modelsError} />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center">
+              <h1 className="mb-10 text-center text-4xl font-medium tracking-tight text-slate-900 sm:text-5xl dark:text-slate-100">
+                Hi {USER_NAME},{" "}
+                <span className="bg-linear-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
+                  let&apos;s get started
+                </span>
+              </h1>
               <ActiveDocuments />
-              <Composer />
+              <Composer {...attachmentsState} />
               <ErrorNote message={modelsError} />
             </div>
-          </>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center">
-            <h1 className="mb-10 text-center text-4xl font-medium tracking-tight text-slate-900 sm:text-5xl dark:text-slate-100">
-              Hi {USER_NAME},{" "}
-              <span className="bg-linear-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
-                let&apos;s get started
-              </span>
-            </h1>
-            <ActiveDocuments />
-            <Composer />
-            <ErrorNote message={modelsError} />
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      )}
     </div>
   );
 }
@@ -147,6 +171,8 @@ function Sidebar({
   documentsButtonRef,
   documentsOpen,
   onToggleDocuments,
+  filesOpen,
+  onOpenFiles,
   settingsButtonRef,
   settingsOpen,
   onToggleSettings,
@@ -158,6 +184,8 @@ function Sidebar({
   documentsButtonRef: React.RefObject<HTMLButtonElement | null>;
   documentsOpen: boolean;
   onToggleDocuments: () => void;
+  filesOpen: boolean;
+  onOpenFiles: () => void;
   settingsButtonRef: React.RefObject<HTMLButtonElement | null>;
   settingsOpen: boolean;
   onToggleSettings: () => void;
@@ -183,6 +211,9 @@ function Sidebar({
           active={documentsOpen}
         >
           <DocumentTextIcon className="size-5" />
+        </RailButton>
+        <RailButton label="Files" onClick={onOpenFiles} active={filesOpen}>
+          <FolderIcon className="size-5" />
         </RailButton>
       </div>
 

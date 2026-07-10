@@ -103,6 +103,39 @@ export function getAllTranscripts(): HistoryTurn[][] {
   return rows.map((r) => JSON.parse(r.transcript) as HistoryTurn[]);
 }
 
+/** Batch title lookup for the Files gallery's "source chat" labels. */
+export function getConversationTitlesByIds(ids: string[]): Map<string, string> {
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = getDb()
+    .prepare(`SELECT id, title FROM conversations WHERE id IN (${placeholders})`)
+    .all(...ids) as { id: string; title: string }[];
+  return new Map(rows.map((r) => [r.id, r.title]));
+}
+
+/**
+ * Documents are a global library, not owned by one conversation, so "which
+ * chats reference this document" is computed on demand (Files gallery load +
+ * delete confirmation) rather than tracked in a many-to-many table — a scan
+ * across a personal-scale history is cheap enough for an action this rare.
+ */
+export function listConversationsReferencingDocument(documentId: string): { id: string; title: string }[] {
+  const rows = getDb().prepare(`SELECT id, title, transcript FROM conversations`).all() as {
+    id: string;
+    title: string;
+    transcript: string;
+  }[];
+  const result: { id: string; title: string }[] = [];
+  for (const row of rows) {
+    const turns = JSON.parse(row.transcript) as HistoryTurn[];
+    const referenced = turns.some(
+      (t) => t.role === "user" && Array.isArray(t.documentIds) && (t.documentIds as string[]).includes(documentId),
+    );
+    if (referenced) result.push({ id: row.id, title: row.title });
+  }
+  return result;
+}
+
 export function upsertConversation(id: string, model: string, turns: HistoryTurn[]): void {
   if (turns.length === 0) return;
   const database = getDb();
