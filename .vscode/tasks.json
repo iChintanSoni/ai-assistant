@@ -1,0 +1,61 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Frontend",
+      "type": "npm",
+      "script": "dev:web",
+      "path": "",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "run-all",
+        "clear": true
+      }
+    },
+    {
+      "label": "Run Agent",
+      "type": "npm",
+      "script": "dev:agent",
+      "path": "",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "run-all",
+        "clear": true
+      }
+    },
+    {
+      "label": "Run File Storage",
+      "type": "npm",
+      "script": "dev:files",
+      "path": "",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "run-all",
+        "clear": true
+      }
+    },
+    {
+      "label": "Run All Apps",
+      "dependsOn": [
+        "Run Frontend",
+        "Run Agent",
+        "Run File Storage"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}
