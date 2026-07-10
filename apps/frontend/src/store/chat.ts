@@ -5,12 +5,27 @@ import type { ApprovalRequest, Envelope } from "../lib/envelope";
 
 export type TurnStatus = "streaming" | "complete" | "canceled" | "failed" | "input-required";
 
+/** Token usage for a turn (or a completed subagent delegation within it). */
+export interface TurnUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+/** A one-shot record of the summarization middleware compacting older history mid-turn. */
+export interface UICompaction {
+  id: string;
+  summary: string;
+}
+
 export interface UIToolCall {
   id: string;
   name: string;
   args?: unknown;
   output?: unknown;
   status: "started" | "completed" | "error";
+  /** Only ever set on subagent entries — the subagent's own token usage, tracked separately from the main turn total. */
+  usage?: TurnUsage;
 }
 
 /** A file-storage URL, persisted as-is in history so it stays navigable across reloads. */
@@ -41,6 +56,10 @@ export interface UITurn {
   documentIds?: string[];
   approvals?: ApprovalRequest[];
   subagents?: UIToolCall[];
+  compactions?: UICompaction[];
+  /** Cumulative conversation total as of this turn (not a sum across turns — Ollama
+   * resends the whole growing history each call, so the latest snapshot IS the total). */
+  usage?: TurnUsage;
 }
 
 interface ChatState {
@@ -95,7 +114,7 @@ function upsertSubagent(turn: UITurn, id: string, patch: Partial<UIToolCall>): U
   const idx = list.findIndex((x) => x.id === id);
   const next = list.slice();
   if (idx >= 0) next[idx] = { ...(next[idx] as UIToolCall), ...patch, id };
-  else next.push({ id, name: patch.name ?? "subagent", args: patch.args, output: patch.output, status: patch.status ?? "started" });
+  else next.push({ id, name: patch.name ?? "subagent", args: patch.args, output: patch.output, usage: patch.usage, status: patch.status ?? "started" });
   return { ...turn, subagents: next };
 }
 
@@ -223,8 +242,22 @@ export const useChatStore = create<ChatState>((set) => ({
           if (env.name) patch.name = env.name;
           if (env.args !== undefined) patch.args = env.args;
           if (env.output !== undefined) patch.output = env.output;
+          if (env.usage) patch.usage = env.usage;
           return { turns: mapLastAgent(s.turns, (t) => upsertSubagent(t, id, patch)) };
         }
+        case "usage":
+          return env.usage
+            ? { turns: mapLastAgent(s.turns, (t) => ({ ...t, usage: env.usage })) }
+            : {};
+        case "compaction":
+          return typeof env.output === "string" && env.output
+            ? {
+                turns: mapLastAgent(s.turns, (t) => ({
+                  ...t,
+                  compactions: [...(t.compactions ?? []), { id: env.id ?? crypto.randomUUID(), summary: env.output as string }],
+                })),
+              }
+            : {};
         case "error":
           return {
             turns: mapLastAgent(s.turns, (t) => ({

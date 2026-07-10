@@ -6,6 +6,7 @@ import { getTools, RISKY_TOOLS } from "./tools.js";
 import { buildBackend } from "./backends.js";
 import { getSubagents } from "./subagents.js";
 import { ollamaToolContentFix } from "./middleware.js";
+import { describeModel } from "./models.js";
 import { config } from "../config.js";
 
 // Risky tools pause for human approve/reject before executing (HITL).
@@ -53,12 +54,30 @@ export type Agent = Awaited<ReturnType<typeof createDeepAgent>>;
 
 const cache = new Map<string, Promise<Agent>>();
 
+async function resolveNumCtx(modelName: string): Promise<number | undefined> {
+  const { contextLength } = await describeModel(modelName);
+  if (contextLength == null) return undefined;
+  return config.maxContextTokens ? Math.min(contextLength, config.maxContextTokens) : contextLength;
+}
+
 export function buildAgent(modelName: string): Promise<Agent> {
   let existing = cache.get(modelName);
   if (!existing) {
-    const model = new ChatOllama({ model: modelName, baseUrl: config.ollamaBaseUrl });
-    existing = Promise.resolve(
-      createDeepAgent({
+    existing = resolveNumCtx(modelName).then((numCtx) => {
+      const model = new ChatOllama({ model: modelName, baseUrl: config.ollamaBaseUrl, numCtx });
+      // createDeepAgent always wires in its own summarization/compaction middleware, but it
+      // only picks a context-aware trigger (85% of maxInputTokens, keeping the last 10%) when
+      // the resolved model exposes a LangChain `.profile` — ChatOllama doesn't, so without this
+      // it silently falls back to a fixed 170k-token trigger unrelated to this model's real
+      // context window. We already resolve each model's actual numCtx above, so report it as
+      // the model's profile to make the library's own default trigger correct for this model.
+      if (numCtx) {
+        Object.defineProperty(model, "profile", {
+          get: () => ({ maxInputTokens: numCtx }),
+          configurable: true,
+        });
+      }
+      return createDeepAgent({
         model,
         tools: getTools(),
         systemPrompt: SYSTEM_PROMPT,
@@ -67,8 +86,8 @@ export function buildAgent(modelName: string): Promise<Agent> {
         subagents: getSubagents(),
         middleware: [ollamaToolContentFix],
         interruptOn,
-      }),
-    );
+      });
+    });
     cache.set(modelName, existing);
   }
   return existing;

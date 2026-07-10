@@ -21,6 +21,8 @@ export interface ModelInfo {
   modalities: Modality[];
   tools: boolean;
   thinking: boolean;
+  /** The model's real trained max context length (from Ollama), or null if it couldn't be determined. */
+  contextLength: number | null;
 }
 
 interface OllamaTagsResponse {
@@ -28,11 +30,18 @@ interface OllamaTagsResponse {
 }
 interface OllamaShowResponse {
   capabilities?: string[];
+  details?: { family?: string };
+  model_info?: Record<string, unknown>;
   error?: string;
 }
 
-// Capabilities of a given model tag don't change while the process runs.
-const capsCache = new Map<string, string[]>();
+interface ModelDetails {
+  capabilities: string[];
+  contextLength: number | null;
+}
+
+// Details of a given model tag don't change while the process runs.
+const detailsCache = new Map<string, ModelDetails>();
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -40,9 +49,19 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** Raw Ollama capability list for a model (cached, empty on failure). */
-export async function getCapabilities(model: string): Promise<string[]> {
-  const cached = capsCache.get(model);
+/** `model_info["<family>.context_length"]`, falling back to any key ending in `.context_length`. */
+function extractContextLength(modelInfo: Record<string, unknown> | undefined, family: string | undefined): number | null {
+  if (!modelInfo) return null;
+  const direct = family ? modelInfo[`${family}.context_length`] : undefined;
+  if (typeof direct === "number") return direct;
+  const fallbackKey = Object.keys(modelInfo).find((k) => k.endsWith(".context_length"));
+  const fallback = fallbackKey ? modelInfo[fallbackKey] : undefined;
+  return typeof fallback === "number" ? fallback : null;
+}
+
+/** Capabilities + real context length for a model (cached, empty/null on failure). */
+export async function getModelDetails(model: string): Promise<ModelDetails> {
+  const cached = detailsCache.get(model);
   if (cached) return cached;
   try {
     const data = await fetchJson<OllamaShowResponse>(`${config.ollamaBaseUrl}/api/show`, {
@@ -50,19 +69,29 @@ export async function getCapabilities(model: string): Promise<string[]> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model }),
     });
-    const caps = data.capabilities ?? [];
-    capsCache.set(model, caps);
-    return caps;
+    const details: ModelDetails = {
+      capabilities: data.capabilities ?? [],
+      contextLength: extractContextLength(data.model_info, data.details?.family),
+    };
+    detailsCache.set(model, details);
+    return details;
   } catch {
-    return [];
+    return { capabilities: [], contextLength: null };
   }
 }
 
-export function toModelInfo(name: string, caps: string[]): ModelInfo {
+export function toModelInfo(name: string, details: ModelDetails): ModelInfo {
+  const { capabilities: caps, contextLength } = details;
   const modalities: Modality[] = ["text"];
   if (caps.includes("vision")) modalities.push("image");
   if (caps.includes("audio")) modalities.push("audio");
-  return { name, modalities, tools: caps.includes("tools"), thinking: caps.includes("thinking") };
+  return {
+    name,
+    modalities,
+    tools: caps.includes("tools"),
+    thinking: caps.includes("thinking"),
+    contextLength,
+  };
 }
 
 /** A model usable as the deep-agent orchestrator: a chat model that supports tools. */
@@ -79,8 +108,8 @@ export async function listModels(): Promise<ModelInfo[]> {
 
   const infos: ModelInfo[] = [];
   for (const name of names) {
-    const caps = await getCapabilities(name);
-    if (isOrchestratorEligible(caps)) infos.push(toModelInfo(name, caps));
+    const details = await getModelDetails(name);
+    if (isOrchestratorEligible(details.capabilities)) infos.push(toModelInfo(name, details));
   }
   infos.sort((a, b) => a.name.localeCompare(b.name));
   return infos;
@@ -88,6 +117,6 @@ export async function listModels(): Promise<ModelInfo[]> {
 
 /** Capability check used server-side to validate a chosen model + its uploads. */
 export async function describeModel(name: string): Promise<ModelInfo & { eligible: boolean }> {
-  const caps = await getCapabilities(name);
-  return { ...toModelInfo(name, caps), eligible: isOrchestratorEligible(caps) };
+  const details = await getModelDetails(name);
+  return { ...toModelInfo(name, details), eligible: isOrchestratorEligible(details.capabilities) };
 }

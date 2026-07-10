@@ -29,9 +29,15 @@ interface StreamEvent {
   };
 }
 
+interface SummarizationEvent {
+  cutoffIndex: number;
+  summaryMessage?: { content?: unknown };
+}
+
 interface StateSnapshotLike {
   next: string[];
   tasks: Array<{ interrupts?: Array<{ id?: string; value?: unknown }> }>;
+  values?: { _summarizationEvent?: SummarizationEvent };
 }
 
 interface AgentLike {
@@ -45,9 +51,20 @@ export interface HITLRequestValue {
   reviewConfigs?: Array<{ actionName: string; allowedDecisions?: string[] }>;
 }
 
+export interface TurnUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
 export interface RunResult {
   finalText: string;
   interrupt: HITLRequestValue | null;
+  /** Latest chat-model call's usage — since Ollama resends the whole growing history
+   * each call, this already reflects the full current conversation size (not a sum). */
+  usage: TurnUsage | null;
+  /** Set when the summarization middleware compacted older history during this turn. */
+  compaction: { summary: string } | null;
 }
 
 interface RunArgs {
@@ -103,6 +120,43 @@ function normalizeToolOutput(output: unknown): unknown {
   return output ?? null;
 }
 
+/** ChatOllama populates `usage_metadata: { input_tokens, output_tokens, total_tokens }`
+ * directly on the AIMessageChunk, same level as `.content`. */
+function extractUsage(chunk: unknown): TurnUsage | null {
+  if (!chunk || typeof chunk !== "object") return null;
+  const usage = (chunk as { usage_metadata?: unknown }).usage_metadata;
+  if (!usage || typeof usage !== "object") return null;
+  const u = usage as { input_tokens?: unknown; output_tokens?: unknown; total_tokens?: unknown };
+  if (typeof u.input_tokens !== "number" || typeof u.output_tokens !== "number") return null;
+  return {
+    inputTokens: u.input_tokens,
+    outputTokens: u.output_tokens,
+    totalTokens: typeof u.total_tokens === "number" ? u.total_tokens : u.input_tokens + u.output_tokens,
+  };
+}
+
+const ZERO_USAGE: TurnUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+/**
+ * Folds a new usage sample onto a running accumulator. Ollama reuses its KV cache
+ * across chat-model calls that share a prefix (confirmed live: a second call's
+ * `prompt_eval_count` reflected only the newly-added tokens, not the whole resent
+ * history), so consecutive calls are normally *incremental* and should add. But if a
+ * call's own `inputTokens` already meets or exceeds everything accumulated so far,
+ * that call evaluated at least as much as we'd already counted — i.e. this was a
+ * cache-miss/full resend — so its own total supersedes the running tally instead of
+ * stacking on top of it (which would double-count). This makes the running total
+ * correct regardless of whether a given call turns out to be a cache hit or miss.
+ */
+function foldUsage(acc: TurnUsage, sample: TurnUsage): TurnUsage {
+  if (sample.inputTokens >= acc.totalTokens) return sample;
+  return {
+    inputTokens: acc.inputTokens + sample.inputTokens,
+    outputTokens: acc.outputTokens + sample.outputTokens,
+    totalTokens: acc.totalTokens + sample.totalTokens,
+  };
+}
+
 /** Runs the agent, emits streaming envelopes, returns final text + any interrupt. */
 export async function runAgentToEvents({
   agent,
@@ -115,6 +169,18 @@ export async function runAgentToEvents({
   let streamedText = "";
   let lastFinal = "";
   let subagentDepth = 0; // > 0 while inside a delegated subagent run
+  let turnUsage: TurnUsage = ZERO_USAGE; // this turn's own new context contribution (folded across calls, e.g. a tool-loop)
+  let nestedUsage: TurnUsage = ZERO_USAGE; // the current delegation's own new context contribution
+
+  // Snapshot the summarization cutoff before this turn runs, so we can tell after the fact
+  // whether the summarization middleware compacted older history *during* this turn.
+  let cutoffBefore: number | undefined;
+  try {
+    const before = await a.getState({ configurable: { thread_id: threadId } });
+    cutoffBefore = before.values?._summarizationEvent?.cutoffIndex;
+  } catch {
+    // Fresh thread with no prior state — treat as no prior compaction.
+  }
 
   const stream = a.streamEvents(input, {
     version: "v2",
@@ -139,9 +205,14 @@ export async function runAgentToEvents({
         break;
       }
       case "on_chat_model_end": {
-        if (nested) break;
+        const usage = extractUsage(ev.data?.output);
+        if (nested) {
+          if (usage) nestedUsage = foldUsage(nestedUsage, usage);
+          break;
+        }
         const finalText = toText((ev.data?.output as { content?: unknown })?.content);
         if (finalText.trim()) lastFinal = finalText;
+        if (usage) turnUsage = foldUsage(turnUsage, usage);
         break;
       }
       case "on_tool_start": {
@@ -175,6 +246,7 @@ export async function runAgentToEvents({
             status: "started",
           });
           subagentDepth += 1;
+          nestedUsage = ZERO_USAGE; // fresh delegation: don't carry over a prior one's usage
         } else if (!nested) {
           publisher.emit({
             v: 1,
@@ -195,8 +267,10 @@ export async function runAgentToEvents({
             type: "subagent",
             id: ev.run_id,
             output: normalizeToolOutput(ev.data?.output),
+            usage: nestedUsage.totalTokens > 0 ? nestedUsage : undefined,
             status: "completed",
           });
+          nestedUsage = ZERO_USAGE;
         } else if (!nested) {
           publisher.emit({
             v: 1,
@@ -214,18 +288,36 @@ export async function runAgentToEvents({
     }
   }
 
-  if (signal.aborted) return { finalText: lastFinal || streamedText, interrupt: null };
+  if (signal.aborted)
+    return {
+      finalText: lastFinal || streamedText,
+      interrupt: null,
+      usage: turnUsage.totalTokens > 0 ? turnUsage : null,
+      compaction: null,
+    };
 
-  // Did the run pause at a human-in-the-loop interrupt?
+  // Did the run pause at a human-in-the-loop interrupt? Did this turn compact older history?
   let interrupt: HITLRequestValue | null = null;
+  let compaction: { summary: string } | null = null;
   try {
     const snap = await a.getState({ configurable: { thread_id: threadId } });
     const interrupts = (snap.tasks ?? []).flatMap((t) => t.interrupts ?? []);
     const value = interrupts[0]?.value;
     if (value && typeof value === "object") interrupt = value as HITLRequestValue;
+
+    const event = snap.values?._summarizationEvent;
+    if (event && event.cutoffIndex !== cutoffBefore) {
+      const summary = toText(event.summaryMessage?.content).trim();
+      if (summary) compaction = { summary };
+    }
   } catch {
-    // If state can't be read, treat as no interrupt.
+    // If state can't be read, treat as no interrupt / no compaction.
   }
 
-  return { finalText: lastFinal || streamedText, interrupt };
+  return {
+    finalText: lastFinal || streamedText,
+    interrupt,
+    usage: turnUsage.totalTokens > 0 ? turnUsage : null,
+    compaction,
+  };
 }

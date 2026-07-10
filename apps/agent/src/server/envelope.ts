@@ -13,6 +13,8 @@ export type EnvelopeType =
   | "tool_result"
   | "subagent"
   | "approval"
+  | "usage"
+  | "compaction"
   | "error";
 
 export type EnvelopeStatus = "started" | "delta" | "completed" | "error";
@@ -23,6 +25,13 @@ export interface ApprovalRequest {
   args?: Record<string, unknown>;
   description?: string;
   allowedDecisions?: string[];
+}
+
+/** Token usage for one chat-model call (or the running total for the turn). */
+export interface TurnUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
 }
 
 export interface Envelope {
@@ -41,6 +50,8 @@ export interface Envelope {
   output?: unknown;
   /** Pending approvals, for `type: "approval"`. */
   requests?: ApprovalRequest[];
+  /** Token usage, for `type: "usage"` (turn total) or a completed `subagent` (its own usage). */
+  usage?: TurnUsage;
   status?: EnvelopeStatus;
 }
 

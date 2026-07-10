@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { ArrowUpIcon, PaperClipIcon, StopIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { ModelSelector } from "./ModelSelector";
+import { UsageGauge } from "./UsageGauge";
 import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../store/chat";
 import type { PendingAttachment } from "../hooks/useAttachments";
@@ -112,6 +113,7 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           className="min-w-0 flex-1 bg-transparent text-base text-slate-800 placeholder:text-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder:text-slate-500"
         />
 
+        <UsageGauge />
         <ModelSelector />
 
         {isStreaming ? (

@@ -34,6 +34,11 @@ export const config = {
   // entirely and are answered from the full text directly (~4 chars/token estimate).
   smallDocTokenBudget: Number(process.env.SMALL_DOC_TOKEN_BUDGET ?? 6000),
   documentChunkTokenBudget: Number(process.env.DOCUMENT_CHUNK_TOKEN_BUDGET ?? 500),
+  // Orchestrator numCtx is set to the model's real reported max context length by
+  // default (see agent/models.ts). If a model's max is too large for local hardware
+  // (Ollama allocates KV-cache for the full numCtx up front), set this to clamp it —
+  // unset by default, so the full reported max is used as-is.
+  maxContextTokens: process.env.MAX_CONTEXT_TOKENS ? Number(process.env.MAX_CONTEXT_TOKENS) : undefined,
 } as const;
 
 export type Config = typeof config;

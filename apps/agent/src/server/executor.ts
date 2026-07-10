@@ -3,7 +3,7 @@ import { Command } from "@langchain/langgraph";
 import type { AgentExecutor, ExecutionEventBus, RequestContext } from "@a2a-js/sdk/server";
 import type { Message } from "@a2a-js/sdk";
 import { A2APublisher } from "./publisher.js";
-import { runAgentToEvents, type HITLRequestValue } from "./streaming.js";
+import { runAgentToEvents, type HITLRequestValue, type TurnUsage } from "./streaming.js";
 import type { ApprovalRequest, Envelope } from "./envelope.js";
 import { buildAgent } from "../agent/deepAgent.js";
 import { describeModel } from "../agent/models.js";
@@ -72,6 +72,7 @@ export class DeepAgentExecutor implements AgentExecutor {
     const publisher = new A2APublisher(eventBus, taskId, contextId);
     const controller = new AbortController();
     this.runs.set(taskId, { controller, publisher });
+    let usage: TurnUsage | null = null;
 
     try {
       const decisions = extractDecisions(userMessage);
@@ -99,15 +100,19 @@ export class DeepAgentExecutor implements AgentExecutor {
         ? new Command({ resume: { decisions } })
         : { messages: [{ role: "user", content: await buildTurnContent(userMessage) }] };
 
-      const { finalText, interrupt } = await runAgentToEvents({
+      const result = await runAgentToEvents({
         agent,
         input,
         threadId: contextId,
         signal: controller.signal,
         publisher,
       });
+      const { finalText, interrupt, compaction } = result;
+      usage = result.usage;
 
       if (controller.signal.aborted) return; // cancelTask emits the terminal event
+      if (usage) publisher.emit({ v: 1, type: "usage", usage });
+      if (compaction) publisher.emit({ v: 1, type: "compaction", output: compaction.summary, status: "completed" });
       if (interrupt) {
         publisher.inputRequired(approvalEnvelope(interrupt));
         return;
@@ -115,6 +120,7 @@ export class DeepAgentExecutor implements AgentExecutor {
       publisher.complete(finalText || "(no response)");
     } catch (err) {
       if (controller.signal.aborted) return;
+      if (usage) publisher.emit({ v: 1, type: "usage", usage });
       publisher.failed(`Agent error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       this.runs.delete(taskId);

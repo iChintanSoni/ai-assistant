@@ -8,6 +8,8 @@ export interface ModelInfo {
   modalities: Modality[];
   tools: boolean;
   thinking: boolean;
+  /** The model's real trained max context length (from Ollama), or null if it couldn't be determined. */
+  contextLength: number | null;
 }
 
 export interface ModelsResponse {

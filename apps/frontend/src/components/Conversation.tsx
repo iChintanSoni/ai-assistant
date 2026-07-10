@@ -1,6 +1,7 @@
 /** Scrollable transcript: user pills + agent turns (thinking, tools, answer). */
 import { useEffect, useRef, useState } from "react";
 import {
+  ArchiveBoxIcon,
   CheckIcon,
   ChevronRightIcon,
   ClipboardDocumentIcon,
@@ -15,7 +16,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { useChatStore } from "../store/chat";
-import type { LegacyUIAttachment, UIAttachment, UIToolCall, UITurn } from "../store/chat";
+import type { LegacyUIAttachment, UIAttachment, UICompaction, UIToolCall, UITurn } from "../store/chat";
 import { useChat } from "../hooks/useChat";
 import type { ApprovalRequest, Decision } from "../lib/envelope";
 
@@ -320,6 +321,31 @@ function SubagentRow({ sa }: { sa: UIToolCall }) {
   );
 }
 
+/** Shown once when the summarization middleware compacts older history mid-turn to fit the model's context window. */
+function CompactionRow({ compaction }: { compaction: UICompaction }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl bg-slate-50/70 p-3 ring-1 ring-slate-200/60 dark:bg-slate-900/60 dark:ring-slate-700/50">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 rounded text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+      >
+        <ArchiveBoxIcon className="size-4 text-slate-400 dark:text-slate-500" />
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Older messages compacted</span>
+        <ChevronRightIcon
+          className={`ml-auto size-4 text-slate-400 transition-transform dark:text-slate-500 ${open ? "rotate-90" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="mt-2 text-sm text-slate-500 **:text-slate-500 dark:text-slate-400 dark:**:text-slate-400">
+          <Markdown text={compaction.summary} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ApprovalCard({ requests }: { requests: ApprovalRequest[] }) {
   const { respond } = useChat();
   const [decided, setDecided] = useState(false);
@@ -467,6 +493,13 @@ function AgentTurn({ turn }: { turn: UITurn }) {
   return (
     <div className="flex flex-col gap-3">
       {turn.reasoning && <ThinkingBlock text={turn.reasoning} streaming={turn.status === "streaming"} />}
+      {turn.compactions && turn.compactions.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {turn.compactions.map((c) => (
+            <CompactionRow key={c.id} compaction={c} />
+          ))}
+        </div>
+      )}
       {turn.subagents && turn.subagents.length > 0 && (
         <div className="flex flex-col gap-2">
           {turn.subagents.map((sa) => (
