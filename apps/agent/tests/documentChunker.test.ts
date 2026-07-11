@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "vitest";
 import { chunkDocument, fullText, pageCount } from "../src/agent/documentChunker.js";
 import type { DoclingDocument } from "../src/agent/docling.js";
 
@@ -68,30 +67,30 @@ test("chunkDocument preserves reading order and splits on section headers + tabl
   // "Data" gets flushed into its own chunk because a table immediately follows it
   // (tables always force a flush) — this matches the real behavior observed against
   // a live Docling PDF conversion during Phase 1 manual testing.
-  assert.equal(chunks.length, 4);
-  assert.equal(chunks[0]!.kind, "text");
-  assert.match(chunks[0]!.text, /Intro/);
-  assert.match(chunks[0]!.text, /First paragraph/);
+  expect(chunks.length).toBe(4);
+  expect(chunks[0]!.kind).toBe("text");
+  expect(chunks[0]!.text).toMatch(/Intro/);
+  expect(chunks[0]!.text).toMatch(/First paragraph/);
 
-  assert.equal(chunks[1]!.kind, "text");
-  assert.match(chunks[1]!.text, /Data/);
+  expect(chunks[1]!.kind).toBe("text");
+  expect(chunks[1]!.text).toMatch(/Data/);
 
-  assert.equal(chunks[2]!.kind, "table");
-  assert.match(chunks[2]!.text, /\| A \|/);
-  assert.match(chunks[2]!.text, /\| 1 \|/);
+  expect(chunks[2]!.kind).toBe("table");
+  expect(chunks[2]!.text).toMatch(/\| A \|/);
+  expect(chunks[2]!.text).toMatch(/\| 1 \|/);
 
-  assert.equal(chunks[3]!.kind, "text");
-  assert.match(chunks[3]!.text, /Closing paragraph/);
+  expect(chunks[3]!.kind).toBe("text");
+  expect(chunks[3]!.text).toMatch(/Closing paragraph/);
 });
 
 test("chunkDocument tracks page ranges per chunk, including across a page break", () => {
   const chunks = chunkDocument(makeDoc(), 500);
-  assert.equal(chunks[0]!.pageStart, 1);
-  assert.equal(chunks[0]!.pageEnd, 1);
-  assert.equal(chunks[1]!.pageStart, 1); // "Data" header, alone in its own chunk
-  assert.equal(chunks[1]!.pageEnd, 1);
-  assert.equal(chunks[3]!.pageStart, 2); // closing paragraph starts a fresh chunk on page 2
-  assert.equal(chunks[3]!.pageEnd, 2);
+  expect(chunks[0]!.pageStart).toBe(1);
+  expect(chunks[0]!.pageEnd).toBe(1);
+  expect(chunks[1]!.pageStart).toBe(1); // "Data" header, alone in its own chunk
+  expect(chunks[1]!.pageEnd).toBe(1);
+  expect(chunks[3]!.pageStart).toBe(2); // closing paragraph starts a fresh chunk on page 2
+  expect(chunks[3]!.pageEnd).toBe(2);
 });
 
 test("chunkDocument flushes on token budget even without a section header", () => {
@@ -99,7 +98,7 @@ test("chunkDocument flushes on token budget even without a section header", () =
   // A tiny budget forces every text element into its own chunk.
   const chunks = chunkDocument(doc, 1);
   const textChunks = chunks.filter((c) => c.kind === "text");
-  assert.ok(textChunks.length >= 3, `expected budget-forced splitting, got ${textChunks.length} text chunks`);
+  expect(textChunks.length, `expected budget-forced splitting, got ${textChunks.length} text chunks`).toBeGreaterThanOrEqual(3);
 });
 
 test("fullText concatenates elements in reading order", () => {
@@ -107,11 +106,13 @@ test("fullText concatenates elements in reading order", () => {
   const introIdx = text.indexOf("Intro");
   const dataIdx = text.indexOf("Data");
   const closingIdx = text.indexOf("Closing paragraph");
-  assert.ok(introIdx >= 0 && dataIdx > introIdx && closingIdx > dataIdx);
+  expect(introIdx).toBeGreaterThanOrEqual(0);
+  expect(dataIdx).toBeGreaterThan(introIdx);
+  expect(closingIdx).toBeGreaterThan(dataIdx);
 });
 
 test("pageCount returns the highest page number present", () => {
-  assert.equal(pageCount(makeDoc()), 2);
+  expect(pageCount(makeDoc())).toBe(2);
 });
 
 test("chunkDocument returns nothing for a genuinely empty document", () => {
@@ -119,7 +120,7 @@ test("chunkDocument returns nothing for a genuinely empty document", () => {
   doc.body.children = [];
   doc.texts = [];
   doc.tables = [];
-  assert.deepEqual(chunkDocument(doc, 500), []);
+  expect(chunkDocument(doc, 500)).toEqual([]);
 });
 
 test("chunkDocument still recovers texts/tables via the orphan fallback when body.children is empty", () => {
@@ -127,7 +128,7 @@ test("chunkDocument still recovers texts/tables via the orphan fallback when bod
   // doesn't link anything" (the real Docling bug this fallback exists for).
   const doc = makeDoc();
   doc.body.children = [];
-  assert.equal(chunkDocument(doc, 500).length > 0, true);
+  expect(chunkDocument(doc, 500).length).toBeGreaterThan(0);
 });
 
 /**
@@ -152,13 +153,13 @@ function makeUnpaginatedDoc(): DoclingDocument {
 
 test("chunkDocument defaults to page 1 for elements with empty provenance (HTML-shaped input)", () => {
   const chunks = chunkDocument(makeUnpaginatedDoc(), 500);
-  assert.equal(chunks.length, 1);
-  assert.equal(chunks[0]!.pageStart, 1);
-  assert.equal(chunks[0]!.pageEnd, 1);
+  expect(chunks.length).toBe(1);
+  expect(chunks[0]!.pageStart).toBe(1);
+  expect(chunks[0]!.pageEnd).toBe(1);
 });
 
 test("pageCount defaults to 1 for a document with an empty pages map (HTML-shaped input)", () => {
-  assert.equal(pageCount(makeUnpaginatedDoc()), 1);
+  expect(pageCount(makeUnpaginatedDoc())).toBe(1);
 });
 
 /**
@@ -205,7 +206,7 @@ function makeOrphanedContentDoc(): DoclingDocument {
 
 test("chunkDocument recovers text/table content orphaned from body.children instead of dropping it", () => {
   const text = fullText(makeOrphanedContentDoc());
-  assert.match(text, /Heading/);
-  assert.match(text, /Orphaned paragraph/);
-  assert.match(text, /cell/);
+  expect(text).toMatch(/Heading/);
+  expect(text).toMatch(/Orphaned paragraph/);
+  expect(text).toMatch(/cell/);
 });

@@ -9,7 +9,9 @@
     "dev:web": "npm run dev -w frontend",
     "dev:files": "npm run dev -w file-storage",
     "typecheck": "npm run typecheck -w agent && npm run typecheck -w frontend && npm run typecheck -w file-storage",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +23,8 @@
     "apps/file-storage"
   ],
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "@vitest/coverage-v8": "^4.1.10",
+    "concurrently": "^10.0.3",
+    "vitest": "^4.1.10"
   }
 }
