@@ -105,6 +105,15 @@ function mapLastAgent(turns: UITurn[], fn: (t: UITurn) => UITurn): UITurn[] {
   return turns;
 }
 
+/** The document scope in effect when the conversation was last left off — the last user turn's snapshot. */
+function lastActiveDocumentIds(turns: UITurn[]): string[] {
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const t = turns[i];
+    if (t && t.role === "user") return t.documentIds ?? [];
+  }
+  return [];
+}
+
 function upsertTool(turn: UITurn, tc: UIToolCall): UITurn {
   const idx = turn.tools.findIndex((x) => x.id === tc.id);
   const tools = turn.tools.slice();
@@ -167,7 +176,7 @@ export const useChatStore = create<ChatState>((set) => ({
       activeTaskId: null,
       pendingTaskId: null,
       isStreaming: false,
-      activeDocumentIds: [],
+      activeDocumentIds: lastActiveDocumentIds(turns),
     }),
 
   addActiveDocument: (id) =>

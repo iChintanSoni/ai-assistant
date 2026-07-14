@@ -447,8 +447,14 @@ function AttachmentImage({ name, url }: { name: string; url: string }) {
 
 function AttachmentChip({ name, href }: { name: string; href?: string }) {
   const className =
-    "rounded-full bg-white/70 px-2 py-0.5 text-xs text-slate-500 ring-1 ring-slate-200/70 dark:bg-slate-950/50 dark:text-slate-400 dark:ring-slate-700/60";
-  if (!href) return <span className={className}>{name}</span>;
+    "flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1 pr-2.5 pl-2.5 text-xs text-slate-600 ring-1 ring-slate-200/70 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/60";
+  const content = (
+    <>
+      <DocumentTextIcon className="size-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+      <span className="max-w-48 truncate">{name}</span>
+    </>
+  );
+  if (!href) return <span className={className}>{content}</span>;
   return (
     <a
       href={href}
@@ -456,7 +462,7 @@ function AttachmentChip({ name, href }: { name: string; href?: string }) {
       rel="noreferrer"
       className={`${className} transition-colors hover:text-slate-700 dark:hover:text-slate-200`}
     >
-      {name}
+      {content}
     </a>
   );
 }

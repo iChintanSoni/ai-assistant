@@ -84,6 +84,17 @@ test("loadConversation replaces turns/model/context and resets task/streaming st
   expect(s.activeDocumentIds).toEqual([]);
 });
 
+test("loadConversation restores activeDocumentIds from the last user turn's snapshot", () => {
+  const turns = [
+    { id: "1", role: "user" as const, text: "hi", reasoning: "", tools: [], status: "complete" as const, documentIds: ["d1"] },
+    { id: "2", role: "agent" as const, text: "hello", reasoning: "", tools: [], status: "complete" as const },
+    { id: "3", role: "user" as const, text: "and this", reasoning: "", tools: [], status: "complete" as const, documentIds: ["d1", "d2"] },
+    { id: "4", role: "agent" as const, text: "ok", reasoning: "", tools: [], status: "complete" as const },
+  ];
+  useChatStore.getState().loadConversation("c1", "m1", turns);
+  expect(useChatStore.getState().activeDocumentIds).toEqual(["d1", "d2"]);
+});
+
 describe("active documents", () => {
   test("addActiveDocument appends without duplicating", () => {
     useChatStore.getState().addActiveDocument("d1");

@@ -10,7 +10,8 @@ vi.mock("../lib/documents", async (importOriginal) => {
 import { getDocument } from "../lib/documents";
 import type { DocumentSummary } from "../lib/documents";
 import { useChatStore } from "../store/chat";
-import { ActiveDocuments } from "./ActiveDocuments";
+import { ChatFiles } from "./ChatFiles";
+import type { PendingAttachment } from "../hooks/useAttachments";
 
 function doc(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
   return {
@@ -30,6 +31,12 @@ function doc(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
   };
 }
 
+function setup(attachments: PendingAttachment[] = []) {
+  const removeAttachment = vi.fn();
+  const utils = render(<ChatFiles attachments={attachments} removeAttachment={removeAttachment} />);
+  return { ...utils, removeAttachment };
+}
+
 beforeEach(() => {
   vi.mocked(getDocument).mockReset();
   useChatStore.setState({ activeDocumentIds: [] });
@@ -39,8 +46,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test("renders nothing when there are no active documents", () => {
-  const { container } = render(<ActiveDocuments />);
+test("renders nothing when there are no active documents or pending attachments", () => {
+  const { container } = setup();
   expect(container).toBeEmptyDOMElement();
 });
 
@@ -48,7 +55,7 @@ test("shows a placeholder then the document name once it loads", async () => {
   useChatStore.setState({ activeDocumentIds: ["doc-1"] });
   vi.mocked(getDocument).mockResolvedValue(doc());
 
-  render(<ActiveDocuments />);
+  setup();
 
   expect(screen.getByText("Loading…")).toBeInTheDocument();
   await waitFor(() => expect(screen.getByText("report.pdf")).toBeInTheDocument());
@@ -58,10 +65,19 @@ test("shows a failed document with its error as a tooltip", async () => {
   useChatStore.setState({ activeDocumentIds: ["doc-2"] });
   vi.mocked(getDocument).mockResolvedValue(doc({ id: "doc-2", originalName: "bad.pdf", status: "failed", error: "Docling crashed" }));
 
-  render(<ActiveDocuments />);
+  setup();
 
   await waitFor(() => expect(screen.getByText("failed")).toBeInTheDocument());
   expect(screen.getByTitle("Docling crashed")).toBeInTheDocument();
+});
+
+test("shows a distinct state when the document was deleted from the library", async () => {
+  useChatStore.setState({ activeDocumentIds: ["doc-4"] });
+  vi.mocked(getDocument).mockRejectedValue(new Error("HTTP 404"));
+
+  setup();
+
+  await waitFor(() => expect(screen.getByText("Removed from library")).toBeInTheDocument());
 });
 
 test("removing a document calls removeActiveDocument", async () => {
@@ -69,9 +85,44 @@ test("removing a document calls removeActiveDocument", async () => {
   vi.mocked(getDocument).mockResolvedValue(doc({ id: "doc-3", originalName: "a.pdf" }));
   const user = userEvent.setup();
 
-  render(<ActiveDocuments />);
+  setup();
   await waitFor(() => expect(screen.getByText("a.pdf")).toBeInTheDocument());
   await user.click(screen.getByRole("button", { name: /remove a.pdf/i }));
 
   expect(useChatStore.getState().activeDocumentIds).toEqual([]);
+});
+
+test("renders a preview image for an image attachment and a plain chip otherwise", () => {
+  setup([
+    { file: new File(["x"], "photo.png", { type: "image/png" }), previewUrl: "blob:preview" },
+    { file: new File(["x"], "clip.mp3", { type: "audio/mpeg" }) },
+  ]);
+
+  // The preview <img> has alt="" (decorative), which removes it from the accessibility
+  // tree's "img" role entirely, so it must be queried by its alt text instead.
+  expect(screen.getByAltText("")).toHaveAttribute("src", "blob:preview");
+  expect(screen.getByText("photo.png")).toBeInTheDocument();
+  expect(screen.getByText("clip.mp3")).toBeInTheDocument();
+});
+
+test("removing a pending attachment calls removeAttachment with its index", async () => {
+  const user = userEvent.setup();
+  const { removeAttachment } = setup([
+    { file: new File(["x"], "a.png", { type: "image/png" }) },
+    { file: new File(["x"], "b.png", { type: "image/png" }) },
+  ]);
+
+  await user.click(screen.getByRole("button", { name: "Remove b.png" }));
+
+  expect(removeAttachment).toHaveBeenCalledWith(1);
+});
+
+test("shows both active documents and pending attachments together", async () => {
+  useChatStore.setState({ activeDocumentIds: ["doc-1"] });
+  vi.mocked(getDocument).mockResolvedValue(doc());
+
+  setup([{ file: new File(["x"], "photo.png", { type: "image/png" }) }]);
+
+  await waitFor(() => expect(screen.getByText("report.pdf")).toBeInTheDocument());
+  expect(screen.getByText("photo.png")).toBeInTheDocument();
 });

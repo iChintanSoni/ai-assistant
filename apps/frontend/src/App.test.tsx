@@ -16,7 +16,6 @@ vi.mock("./lib/documents", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./lib/documents")>();
   return {
     ...actual,
-    listDocuments: vi.fn().mockResolvedValue([]),
     deleteDocument: vi.fn(),
     getDocument: vi.fn(),
     registerDocument: vi.fn(),
@@ -84,16 +83,17 @@ test("the Files rail button switches to the Files page, and New chat switches ba
   expect(screen.queryByRole("heading", { name: "Files" })).not.toBeInTheDocument();
 });
 
-test("History and Documents panel toggles are mutually exclusive", async () => {
+test("there is no Documents rail button, and History still toggles its panel", async () => {
   const user = userEvent.setup();
   render(<App />);
+
+  expect(screen.queryByRole("button", { name: "Documents" })).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "History" }));
   expect(screen.getByRole("dialog", { name: "Conversation history" })).toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: "Documents" }));
+  await user.click(screen.getByRole("button", { name: "History" }));
   expect(screen.queryByRole("dialog", { name: "Conversation history" })).not.toBeInTheDocument();
-  expect(screen.getByRole("dialog", { name: "Document library" })).toBeInTheDocument();
 });
 
 test("the Settings rail button switches to the Settings page, and New chat switches back", async () => {

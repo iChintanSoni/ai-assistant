@@ -4,13 +4,12 @@
  * that becomes a streaming conversation once you send a message.
  */
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { ClockIcon, Cog6ToothIcon, DocumentTextIcon, FolderIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, Cog6ToothIcon, FolderIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { useChatStore } from "./store/chat";
 import { fetchModels } from "./lib/models";
-import { ActiveDocuments } from "./components/ActiveDocuments";
+import { ChatFiles } from "./components/ChatFiles";
 import { Composer } from "./components/Composer";
 import { Conversation } from "./components/Conversation";
-import { DocumentsPanel } from "./components/DocumentsPanel";
 import { DropOverlay } from "./components/DropOverlay";
 import { FilesPage } from "./components/FilesPage";
 import { HistoryPanel } from "./components/HistoryPanel";
@@ -30,8 +29,6 @@ function App() {
   const hasChat = turns.length > 0;
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
-  const [documentsOpen, setDocumentsOpen] = useState(false);
-  const documentsButtonRef = useRef<HTMLButtonElement>(null);
   const attachmentsState = useAttachments();
   const { isDraggingFiles, dropZoneProps } = useFileDrop(attachmentsState.addFiles);
 
@@ -61,27 +58,16 @@ function App() {
         }}
         historyButtonRef={historyButtonRef}
         historyOpen={historyOpen}
-        onToggleHistory={() => {
-          setHistoryOpen((v) => !v);
-          setDocumentsOpen(false);
-        }}
-        documentsButtonRef={documentsButtonRef}
-        documentsOpen={documentsOpen}
-        onToggleDocuments={() => {
-          setDocumentsOpen((v) => !v);
-          setHistoryOpen(false);
-        }}
+        onToggleHistory={() => setHistoryOpen((v) => !v)}
         filesOpen={view === "files"}
         onOpenFiles={() => {
           navigateToFiles();
           setHistoryOpen(false);
-          setDocumentsOpen(false);
         }}
         settingsOpen={view === "settings"}
         onOpenSettings={() => {
           navigateToSettings();
           setHistoryOpen(false);
-          setDocumentsOpen(false);
         }}
       />
       <HistoryPanel
@@ -89,11 +75,6 @@ function App() {
         onClose={() => setHistoryOpen(false)}
         triggerRef={historyButtonRef}
         navigateToChat={navigateToChat}
-      />
-      <DocumentsPanel
-        open={documentsOpen}
-        onClose={() => setDocumentsOpen(false)}
-        triggerRef={documentsButtonRef}
       />
 
       {view === "files" ? (
@@ -111,7 +92,7 @@ function App() {
             <>
               <Conversation />
               <div className="shrink-0 pt-2 pb-6">
-                <ActiveDocuments />
+                <ChatFiles attachments={attachmentsState.attachments} removeAttachment={attachmentsState.removeAttachment} />
                 <Composer {...attachmentsState} />
                 <ErrorNote message={modelsError} />
               </div>
@@ -124,7 +105,7 @@ function App() {
                   let&apos;s get started
                 </span>
               </h1>
-              <ActiveDocuments />
+              <ChatFiles attachments={attachmentsState.attachments} removeAttachment={attachmentsState.removeAttachment} />
               <Composer {...attachmentsState} />
               <ErrorNote message={modelsError} />
             </div>
@@ -161,9 +142,6 @@ function Sidebar({
   historyButtonRef,
   historyOpen,
   onToggleHistory,
-  documentsButtonRef,
-  documentsOpen,
-  onToggleDocuments,
   filesOpen,
   onOpenFiles,
   settingsOpen,
@@ -173,9 +151,6 @@ function Sidebar({
   historyButtonRef: React.RefObject<HTMLButtonElement | null>;
   historyOpen: boolean;
   onToggleHistory: () => void;
-  documentsButtonRef: React.RefObject<HTMLButtonElement | null>;
-  documentsOpen: boolean;
-  onToggleDocuments: () => void;
   filesOpen: boolean;
   onOpenFiles: () => void;
   settingsOpen: boolean;
@@ -194,14 +169,6 @@ function Sidebar({
           active={historyOpen}
         >
           <ClockIcon className="size-5" />
-        </RailButton>
-        <RailButton
-          ref={documentsButtonRef}
-          label="Documents"
-          onClick={onToggleDocuments}
-          active={documentsOpen}
-        >
-          <DocumentTextIcon className="size-5" />
         </RailButton>
         <RailButton label="Files" onClick={onOpenFiles} active={filesOpen}>
           <FolderIcon className="size-5" />

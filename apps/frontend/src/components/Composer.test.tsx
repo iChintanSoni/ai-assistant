@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 test("the send button is disabled until there's text or an attachment", async () => {
-  const { } = setup();
+  setup();
   expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
 
   const user = userEvent.setup();
@@ -105,28 +105,7 @@ test("choosing files via the hidden file input calls addFiles", async () => {
   expect(addFiles).toHaveBeenCalledWith([file]);
 });
 
-test("renders a preview image for an image attachment and a plain chip otherwise", () => {
-  setup({
-    attachments: [
-      { file: new File(["x"], "photo.png", { type: "image/png" }), previewUrl: "blob:preview" },
-      { file: new File(["x"], "notes.pdf", { type: "application/pdf" }) },
-    ],
-  });
-
-  // The preview <img> has alt="" (decorative), which removes it from the accessibility
-  // tree's "img" role entirely, so it must be queried by its alt text instead.
-  expect(screen.getByAltText("")).toHaveAttribute("src", "blob:preview");
-  expect(screen.getByText("photo.png")).toBeInTheDocument();
-  expect(screen.getByText("notes.pdf")).toBeInTheDocument();
-});
-
-test("removing an attachment calls removeAttachment with its index", async () => {
-  const { removeAttachment } = setup({
-    attachments: [{ file: new File(["x"], "a.png", { type: "image/png" }) }, { file: new File(["x"], "b.png", { type: "image/png" }) }],
-  });
-  const user = userEvent.setup();
-
-  await user.click(screen.getByRole("button", { name: "Remove b.png" }));
-
-  expect(removeAttachment).toHaveBeenCalledWith(1);
+test("a pending attachment still counts toward enabling Send", () => {
+  setup({ attachments: [{ file: new File(["x"], "notes.pdf", { type: "application/pdf" }) }] });
+  expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
 });
