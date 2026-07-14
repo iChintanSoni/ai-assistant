@@ -87,6 +87,7 @@ All state is local SQLite/filesystem — there's no external database.
 
 ## Not built
 
-No CI, no auth/multi-user support, no hosted deployment story — this is a
-local-first, single-user assistant. See the README's Status/Roadmap section
-for what's done.
+No auth/multi-user support, no hosted deployment story — this is a
+local-first, single-user assistant. (CI does exist:
+`.github/workflows/test.yml` runs typecheck + tests on push/PR.) See the
+README's Status/Roadmap section for what's done.

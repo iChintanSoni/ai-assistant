@@ -111,7 +111,13 @@ server exposes plain REST routes the frontend uses directly:
 
 | Route | Purpose |
 | --- | --- |
-| `GET /models` | Installed, orchestrator-eligible models + capabilities. |
+| `GET /models` | Installed, orchestrator-eligible models + capabilities (chat composer's picker). |
+| `GET /ollama/models` | Every local Ollama model, unfiltered, plus the current default/image-gen/embedding model (Settings page). |
+| `PUT /ollama/default-model` | Set the orchestrator's default model. |
+| `PUT /ollama/image-gen-model` | Set the `generate_image` model. |
+| `PUT /ollama/embedding-model` | Set the document-embedding model. |
+| `POST /ollama/pull` | Pull a model; streams Ollama's NDJSON progress through to the client. |
+| `DELETE /ollama/models/:name` | Delete a local Ollama model. |
 | `GET /conversations` | List saved conversation summaries. |
 | `GET /conversations/:id` | Full persisted `UITurn[]` transcript for one conversation. |
 | `PUT /conversations/:id` | Save/overwrite a transcript (called after every turn settles). |
@@ -131,4 +137,8 @@ server exposes plain REST routes the frontend uses directly:
 - `startFileCleanup()` (`fileCleanup.ts`) sweeps file-storage for objects no
   saved transcript still references (attachments/generated images are plain
   URLs inside transcript JSON), on a 6-hour interval plus once at startup,
-  with a 24-hour grace period for in-flight sends.
+  with a 24-hour grace period for in-flight sends. Set `FILE_CLEANUP_ENABLED=false`
+  to disable.
+- `backfillAttachmentsIndex()` (`attachmentsStore.ts`) runs once at startup to
+  index any pre-existing attachments/documents into the `/attachments` table
+  for the Files gallery.

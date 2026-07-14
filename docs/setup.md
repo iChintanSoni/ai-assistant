@@ -61,18 +61,16 @@ cp apps/frontend/.env.example apps/frontend/.env
 | `IMAGE_GEN_MODEL` | `x/z-image-turbo:latest` | Image-generation model. |
 | `IMAGE_GEN_TIMEOUT_MS` | `240000` | Cold-start image generation can take ~100s locally; this gives headroom. |
 | `FILE_STORAGE_BASE_URL` | `http://localhost:6060` | Where generated images are uploaded to become URLs the frontend can display. |
+| `FILE_CLEANUP_ENABLED` | `true` | Orphan file-storage sweep (startup + every 6h). Set to `false` to disable entirely. |
 | `DOCLING_CLI_PATH` | `~/.pyenv/versions/3.12.10/bin/docling` | Path to the Docling CLI. Override if `pip install docling` put it somewhere else — check with `which docling`. |
 | `DOCUMENT_INGEST_TIMEOUT_MS` | `180000` | Timeout for a single Docling conversion. |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model for large-document retrieval. |
 | `CAPTION_MODEL` | `DEFAULT_MODEL` | Vision-capable model used to caption extracted figures at ingest time. |
 | `SMALL_DOC_TOKEN_BUDGET` | `6000` | Documents at/under this size skip embedding and are searched as full text. |
 | `DOCUMENT_CHUNK_TOKEN_BUDGET` | `500` | Target chunk size for larger documents. |
-
-A few more exist only in `src/config.ts` (sane defaults, no `.env.example`
-entry needed unless you're overriding them): `DENO_PATH` (default `deno`,
-used by the `run_javascript` sandbox), `SANDBOX_TIMEOUT_MS` (default
-`10000`), `MAX_CONTEXT_TOKENS` (unset — clamps the orchestrator's context
-window below the model's real max if your hardware needs it).
+| `DENO_PATH` | `deno` | Path to the Deno binary used by the `run_javascript` sandbox. |
+| `SANDBOX_TIMEOUT_MS` | `10000` | Timeout for a single `run_javascript` execution. |
+| `MAX_CONTEXT_TOKENS` | unset | Clamps the orchestrator's context window below the model's real max if your hardware needs it. |
 
 ### `apps/file-storage/.env`
 
@@ -115,5 +113,5 @@ Then open `http://localhost:5173`.
 
 ```
 npm run typecheck          # all three workspaces
-npm run test -w agent       # agent unit tests (documentChunker, embeddings)
+npm run test                # unit tests across all three workspaces (vitest)
 ```

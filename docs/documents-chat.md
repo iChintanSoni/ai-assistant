@@ -85,10 +85,14 @@ document; go straight to `search_documents`/`summarize_document` instead.
 
 ## Frontend surfacing
 
-- `DocumentsPanel.tsx` — a `HistoryPanel`-style rail-triggered flyout for
-  browsing, activating, and deleting library documents.
-- `ActiveDocuments.tsx` — a chip strip above the composer showing documents
-  active in the current conversation, polling ingest status.
+- `FilesPage.tsx` — the full-page Files gallery for browsing and deleting
+  library documents (alongside attachments and generated images); see
+  [frontend.md](frontend.md).
+- `ChatFiles.tsx` — a chip strip above the composer showing documents
+  active in the current conversation, polling ingest status, plus files
+  staged to send next. A document goes "active" by being uploaded/attached
+  during the current conversation — there's no library-browsing action to
+  pull an already-ingested document into a different one.
 - Active document ids ride in `metadata.documentIds` on the outgoing A2A
   message; `executor.ts` prepends a name/id note to the turn (the same
   instruction+tool-call pattern the `/memories/` convention uses) so the

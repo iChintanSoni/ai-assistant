@@ -10,12 +10,16 @@ patterns rather than inventing new ones.
 ## Layout
 
 `App.tsx` is a single non-scrolling viewport: a thin icon rail on the left
-(new chat, history, documents, files, settings), an aurora glow background,
-and one focal interaction — an empty-state hub that becomes a streaming
-conversation once a message is sent. History/Documents/Settings are floating
-flyout panels triggered from the rail (not docked sidebars — the design
-system explicitly avoids a heavy/opaque sidebar); Files is a full page,
-switched via `useConversationRouting.ts`.
+(new chat, history, files, settings), an aurora glow background, and one
+focal interaction — an empty-state hub that becomes a streaming conversation
+once a message is sent. History is a floating flyout panel triggered from
+the rail (not a docked sidebar — the design system explicitly avoids a
+heavy/opaque sidebar); Files and Settings are full pages, switched (along
+with the chat view) via `useConversationRouting.ts`, which also keeps the
+URL in sync (`/`, `/c/:id`, `/files`, `/settings`) for deep links and
+back/forward. There is no separate "documents" rail icon — browsing/deleting
+the persistent document library lives in the Files page alongside
+attachments and generated images.
 
 ## State — `store/chat.ts`
 
@@ -51,11 +55,10 @@ envelopes stream in — `applyEnvelope` is the single reducer for every
 | `ModelSelector.tsx` | Live model picker, populated from `GET /models`; only orchestrator-eligible models are offered. |
 | `UsageGauge.tsx` | A small radial gauge next to the composer showing this conversation's cumulative token usage against the selected model's real context length (`ModelInfo.contextLength`), with a popover breakdown including subagent token usage. |
 | `HistoryPanel.tsx` | Rail-triggered flyout: search/delete/date-grouped list of saved conversations (no rename — deliberately out of scope). |
-| `DocumentsPanel.tsx` | Rail-triggered flyout for the persistent document library — browse/activate/delete. |
-| `ActiveDocuments.tsx` | Chip strip above the composer for documents active in the current conversation, polling ingest status. |
-| `FilesPage.tsx` | Full-page gallery unifying documents, uploaded attachments, and generated images — grid/list view, search, sort, kind filter. |
+| `ChatFiles.tsx` | Chip strip above the composer: documents active in the current conversation (polling ingest status) plus files staged to send next. A document becomes "active" by being uploaded/attached during the current conversation — there's no separate action to pull an existing library document into a new one. |
+| `FilesPage.tsx` | Full-page gallery unifying the persistent document library, uploaded attachments, and generated images — grid/list view, search, sort, kind filter, delete. |
 | `DropOverlay.tsx` | Whole-pane drag-and-drop target, shown via `useFileDrop.ts`. |
-| `SettingsPanel.tsx` | Appearance (light/dark) and other app settings. |
+| `SettingsPage.tsx` | Full-page settings: appearance (light/dark) and Ollama model management (search/pull/delete local models, set the default orchestrator/image-gen/embedding model) via the `/ollama/*` routes ([agent.md](agent.md)). |
 
 ## Attachment intake — `hooks/useAttachments.ts` + `hooks/useFileDrop.ts`
 

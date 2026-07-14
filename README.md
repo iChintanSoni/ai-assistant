@@ -70,8 +70,9 @@ All phases below are built and browser-verified:
 - ✅ Files gallery with drag-and-drop
 - ✅ Documents chat (Docling parsing, hybrid retrieval, figure captioning)
 
-Not built: CI, authentication/multi-user support, a hosted deployment story
-— this is a personal, single-user, local-first project.
+Not built: authentication/multi-user support, a hosted deployment story —
+this is a personal, single-user, local-first project. CI runs typecheck +
+tests on push/PR (`.github/workflows/test.yml`).
 
 ## Docs
 
