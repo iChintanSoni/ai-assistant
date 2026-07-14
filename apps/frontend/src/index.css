@@ -36,14 +36,22 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Slow, organic drift so the aurora glow feels alive rather than static. */
+/*
+  Slow, organic drift so the aurora glow feels alive rather than static.
+  Only `scale`/`translate` (the standalone CSS properties, which is what
+  Tailwind's `-translate-1/2` utility sets) are animated here — never the
+  `transform` property. `transform` composes on TOP of `translate`/`scale`
+  rather than replacing them, so a keyframe `transform: translate(-50%,-50%)`
+  would double the centering offset and drag the glow toward the top-left.
+*/
 @keyframes float {
   0%,
   100% {
-    transform: translate(-50%, -50%) scale(1);
+    scale: 1;
   }
   50% {
-    transform: translate(-50%, -52%) scale(1.08);
+    translate: -50% -52%;
+    scale: 1.08;
   }
 }
 
