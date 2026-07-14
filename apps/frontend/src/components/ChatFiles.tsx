@@ -1,6 +1,11 @@
 /** Chip strip above the Composer: documents active in this conversation, plus files staged to send next. */
 import { useEffect, useRef, useState } from "react";
-import { DocumentTextIcon, ExclamationTriangleIcon, MusicalNoteIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import {
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  MusicalNoteIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import { getDocument, type DocumentSummary } from "../lib/documents";
 import { useChatStore } from "../store/chat";
 import type { PendingAttachment } from "../hooks/useAttachments";
@@ -37,9 +42,23 @@ function Chip({
       title={title}
       className="flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1 pr-1.5 pl-2.5 text-xs text-slate-600 ring-1 ring-slate-200/70 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/60"
     >
-      {image ? <img src={image} alt="" className="size-4 shrink-0 rounded-full object-cover" /> : icon}
-      <span className="max-w-[10rem] truncate">{name}</span>
-      {detail && <span className={detailClassName ?? "text-slate-400 dark:text-slate-500"}>{detail}</span>}
+      {image ? (
+        <img
+          src={image}
+          alt=""
+          className="size-4 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        icon
+      )}
+      <span className="max-w-40 truncate">{name}</span>
+      {detail && (
+        <span
+          className={detailClassName ?? "text-slate-400 dark:text-slate-500"}
+        >
+          {detail}
+        </span>
+      )}
       <button
         type="button"
         aria-label={`Remove ${name}`}
@@ -110,7 +129,12 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
           return (
             <Chip
               key={id}
-              icon={<ExclamationTriangleIcon className="size-3.5 shrink-0 text-rose-500 dark:text-rose-400" aria-hidden="true" />}
+              icon={
+                <ExclamationTriangleIcon
+                  className="size-3.5 shrink-0 text-rose-500 dark:text-rose-400"
+                  aria-hidden="true"
+                />
+              }
               name="Removed from library"
               onRemove={() => removeActiveDocument(id)}
             />
@@ -122,17 +146,35 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
             key={id}
             icon={
               status === "failed" ? (
-                <ExclamationTriangleIcon className="size-3.5 shrink-0 text-rose-500 dark:text-rose-400" aria-hidden="true" />
+                <ExclamationTriangleIcon
+                  className="size-3.5 shrink-0 text-rose-500 dark:text-rose-400"
+                  aria-hidden="true"
+                />
               ) : (
-                <DocumentTextIcon className="size-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                <DocumentTextIcon
+                  className="size-3.5 shrink-0 text-slate-400 dark:text-slate-500"
+                  aria-hidden="true"
+                />
               )
             }
             name={entry?.originalName ?? "Loading…"}
-            detail={status === "pending" ? "processing…" : status === "failed" ? "failed" : undefined}
-            detailClassName={
-              status === "failed" ? "text-rose-500 dark:text-rose-400" : "text-slate-400 italic dark:text-slate-500"
+            detail={
+              status === "pending"
+                ? "processing…"
+                : status === "failed"
+                  ? "failed"
+                  : undefined
             }
-            title={status === "failed" ? (entry?.error ?? "Failed to process") : undefined}
+            detailClassName={
+              status === "failed"
+                ? "text-rose-500 dark:text-rose-400"
+                : "text-slate-400 italic dark:text-slate-500"
+            }
+            title={
+              status === "failed"
+                ? (entry?.error ?? "Failed to process")
+                : undefined
+            }
             onRemove={() => removeActiveDocument(id)}
           />
         );
@@ -143,7 +185,10 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
           image={a.previewUrl}
           icon={
             a.previewUrl ? undefined : (
-              <MusicalNoteIcon className="size-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+              <MusicalNoteIcon
+                className="size-3.5 shrink-0 text-slate-400 dark:text-slate-500"
+                aria-hidden="true"
+              />
             )
           }
           name={a.file.name}

@@ -17,11 +17,11 @@ function AuroraGlow() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 overflow-hidden"
     >
-      <div className="absolute left-1/2 top-[62%] h-[38rem] w-[56rem] -translate-1/2 animate-[float_9s_ease-in-out_infinite] rounded-full bg-blue-400/20 blur-3xl" />
-      <div className="absolute left-[44%] top-[58%] h-[24rem] w-[34rem] -translate-1/2 animate-[float_11s_ease-in-out_infinite_reverse] rounded-full bg-indigo-300/25 blur-3xl" />
-      <div className="absolute left-[57%] top-[66%] h-[22rem] w-[30rem] -translate-1/2 animate-[float_13s_ease-in-out_infinite] rounded-full bg-sky-300/20 blur-3xl" />
+      <div className="absolute left-1/2 top-[62%] h-152 w-4xl -translate-1/2 animate-[float_9s_ease-in-out_infinite] rounded-full bg-blue-400/20 blur-3xl" />
+      <div className="absolute left-[44%] top-[58%] h-96 w-136 -translate-1/2 animate-[float_11s_ease-in-out_infinite_reverse] rounded-full bg-indigo-300/25 blur-3xl" />
+      <div className="absolute left-[57%] top-[66%] h-88 w-120 -translate-1/2 animate-[float_13s_ease-in-out_infinite] rounded-full bg-sky-300/20 blur-3xl" />
     </div>
-  )
+  );
 }
 ```
 
@@ -52,14 +52,14 @@ focal element, move the glow with it. Verify by screenshot (see below).
 
 ## Tuning guide
 
-| Want… | Change |
-| --- | --- |
-| Bigger / more present glow | Increase `h-`/`w-` rem values |
-| Softer, more diffuse | Keep `blur-3xl`; lower opacity to `/15`–`/20` |
-| More vivid | Raise opacity toward `/25`; do not exceed `/30` |
-| Shift the hotspot | Move `left-*` / `top-*` of the largest (blue) blob |
-| Different mood | Swap hues within pastel blues: `sky`, `blue`, `indigo`, `cyan`, `violet` |
-| Calmer motion | Longer durations in the `animate-[...]` (see motion.md) |
+| Want…                      | Change                                                                   |
+| -------------------------- | ------------------------------------------------------------------------ |
+| Bigger / more present glow | Increase `h-`/`w-` rem values                                            |
+| Softer, more diffuse       | Keep `blur-3xl`; lower opacity to `/15`–`/20`                            |
+| More vivid                 | Raise opacity toward `/25`; do not exceed `/30`                          |
+| Shift the hotspot          | Move `left-*` / `top-*` of the largest (blue) blob                       |
+| Different mood             | Swap hues within pastel blues: `sky`, `blue`, `indigo`, `cyan`, `violet` |
+| Calmer motion              | Longer durations in the `animate-[...]` (see motion.md)                  |
 
 ## Dark mode
 
