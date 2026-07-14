@@ -134,17 +134,23 @@ function Caret() {
   );
 }
 
-function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
+function ThinkingBlock({ text, active }: { text: string; active: boolean }) {
   const [open, setOpen] = useState(true);
+  // Once the user manually toggles, their choice wins for good — the auto-collapse
+  // effect below must never fight a click and re-close (or re-open) it after that.
+  const userToggled = useRef(false);
   useEffect(() => {
-    if (!streaming) setOpen(false);
-  }, [streaming]);
+    if (!active && !userToggled.current) setOpen(false);
+  }, [active]);
 
   return (
     <div className="rounded-2xl bg-slate-50/70 p-3 ring-1 ring-slate-200/60 dark:bg-slate-900/60 dark:ring-slate-700/50">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          userToggled.current = true;
+          setOpen((v) => !v);
+        }}
         className="flex items-center gap-1.5 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:text-slate-200"
       >
         <LightBulbIcon className="size-3.5" />
@@ -436,12 +442,20 @@ function AttachmentImage({ name, url }: { name: string; url: string }) {
   const [errored, setErrored] = useState(false);
   if (errored) return <AttachmentChip name={`${name} (file removed)`} />;
   return (
-    <img
-      src={url}
-      alt={name}
-      onError={() => setErrored(true)}
-      className="size-14 rounded-xl object-cover ring-1 ring-slate-200/60 dark:ring-slate-700/60"
-    />
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Open ${name}`}
+      className="block rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+    >
+      <img
+        src={url}
+        alt={name}
+        onError={() => setErrored(true)}
+        className="size-14 rounded-xl object-cover ring-1 ring-slate-200/60 transition hover:opacity-90 dark:ring-slate-700/60"
+      />
+    </a>
   );
 }
 
@@ -549,7 +563,9 @@ function AgentTurn({ turn }: { turn: UITurn }) {
     .filter((x): x is { id: string; image: { url: string }; prompt: string | undefined } => x.image !== null);
   return (
     <div className="flex flex-col gap-3">
-      {turn.reasoning && <ThinkingBlock text={turn.reasoning} streaming={turn.status === "streaming"} />}
+      {turn.reasoning && (
+        <ThinkingBlock text={turn.reasoning} active={turn.status === "streaming" && !turn.text} />
+      )}
       {turn.compactions && turn.compactions.length > 0 && (
         <div className="flex flex-col gap-2">
           {turn.compactions.map((c) => (

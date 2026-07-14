@@ -110,7 +110,10 @@ export function useChat() {
 
     store.beginTurn(text, attachments, store.activeDocumentIds);
 
-    await streamMessage({
+    // Fire-and-forget: streamMessage handles its own errors (finishTurn("failed", ...)),
+    // so callers only need to wait for the message to be dispatched, not for the whole
+    // response to finish streaming back.
+    void streamMessage({
       kind: "message",
       role: "user",
       messageId: crypto.randomUUID(),

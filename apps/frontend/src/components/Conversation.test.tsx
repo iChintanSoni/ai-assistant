@@ -42,6 +42,14 @@ test("renders a user turn's text and attachments (image, chip, legacy string)", 
   expect(screen.getByAltText("photo.png")).toHaveAttribute("src", "http://files/photo.png");
   expect(screen.getByText("notes.pdf")).toBeInTheDocument();
   expect(screen.getByText("legacy-plain.txt")).toBeInTheDocument();
+
+  const imageLink = screen.getByRole("link", { name: "Open photo.png" });
+  expect(imageLink).toHaveAttribute("href", "http://files/photo.png");
+  expect(imageLink).toHaveAttribute("target", "_blank");
+
+  const chipLink = screen.getByText("notes.pdf").closest("a");
+  expect(chipLink).toHaveAttribute("href", "http://files/notes.pdf");
+  expect(chipLink).toHaveAttribute("target", "_blank");
 });
 
 test("renders agent markdown text with a copy button once complete, none while streaming", () => {
@@ -66,6 +74,30 @@ test("shows a collapsible thinking block for reasoning text, auto-collapsing onc
 
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: /thinking/i }));
+  expect(screen.getByText("pondering deeply")).toBeInTheDocument();
+});
+
+test("collapses the thinking block as soon as response text starts streaming, before the turn completes", async () => {
+  useChatStore.setState({ turns: [agentTurn({ reasoning: "pondering deeply", status: "streaming" })] });
+  const { rerender } = render(<Conversation />);
+  expect(screen.getByText("pondering deeply")).toBeInTheDocument();
+
+  useChatStore.setState({
+    turns: [agentTurn({ reasoning: "pondering deeply", text: "here's the answer", status: "streaming" })],
+  });
+  rerender(<Conversation />);
+  await waitFor(() => expect(screen.queryByText("pondering deeply")).not.toBeInTheDocument());
+  expect(screen.getByText("here's the answer")).toBeInTheDocument();
+
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /thinking/i }));
+  expect(screen.getByText("pondering deeply")).toBeInTheDocument();
+
+  // Manual reopen must survive further streaming and turn completion, not just the next render.
+  useChatStore.setState({
+    turns: [agentTurn({ reasoning: "pondering deeply", text: "here's the full answer", status: "complete" })],
+  });
+  rerender(<Conversation />);
   expect(screen.getByText("pondering deeply")).toBeInTheDocument();
 });
 
