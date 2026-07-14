@@ -19,6 +19,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
+import { getImageGenModel } from "./models.js";
 
 export interface ImageGenArgs {
   prompt: string;
@@ -41,7 +42,7 @@ function parseSavedFilename(output: string): string | null {
 }
 
 async function runOllamaCli(args: ImageGenArgs, cwd: string): Promise<string> {
-  const argv = ["run", config.imageGenModel, args.prompt];
+  const argv = ["run", getImageGenModel(), args.prompt];
   if (args.width) argv.push("--width", String(args.width));
   if (args.height) argv.push("--height", String(args.height));
   if (args.negativePrompt) argv.push("--negative", args.negativePrompt);

@@ -1,15 +1,15 @@
 /**
  * Keeps the URL in sync with the active view: `/` is the empty hub, `/c/:id`
- * is an open conversation, `/files` is the Files gallery page. Handles deep
- * links/refresh (restore from URL on mount) and browser back/forward, using
- * the native History API — there are only ever three "pages" here, so a
- * router dependency isn't needed.
+ * is an open conversation, `/files` is the Files gallery page, `/settings`
+ * is the Settings page. Handles deep links/refresh (restore from URL on
+ * mount) and browser back/forward, using the native History API — there are
+ * only ever four "pages" here, so a router dependency isn't needed.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getConversation } from "../lib/history";
 import { useChatStore } from "../store/chat";
 
-export type RouteView = "chat" | "files";
+export type RouteView = "chat" | "files" | "settings";
 
 function conversationIdFromPath(pathname: string): string | null {
   const match = /^\/c\/([^/]+)\/?$/.exec(pathname);
@@ -17,7 +17,9 @@ function conversationIdFromPath(pathname: string): string | null {
 }
 
 function viewFromPath(pathname: string): RouteView {
-  return pathname === "/files" ? "files" : "chat";
+  if (pathname === "/files") return "files";
+  if (pathname === "/settings") return "settings";
+  return "chat";
 }
 
 async function loadFromUrl(id: string): Promise<void> {
@@ -31,7 +33,12 @@ async function loadFromUrl(id: string): Promise<void> {
   }
 }
 
-export function useConversationRouting(): { view: RouteView; navigateToFiles: () => void; navigateToChat: () => void } {
+export function useConversationRouting(): {
+  view: RouteView;
+  navigateToFiles: () => void;
+  navigateToSettings: () => void;
+  navigateToChat: () => void;
+} {
   const contextId = useChatStore((s) => s.contextId);
   const lastSynced = useRef<string | null | undefined>(undefined);
   const [view, setView] = useState<RouteView>(() => viewFromPath(window.location.pathname));
@@ -68,7 +75,7 @@ export function useConversationRouting(): { view: RouteView; navigateToFiles: ()
       setView(viewFromPath(pathname));
       const id = conversationIdFromPath(pathname);
       if (id) void loadFromUrl(id);
-      else if (pathname !== "/files") useChatStore.getState().newChat();
+      else if (pathname !== "/files" && pathname !== "/settings") useChatStore.getState().newChat();
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -79,9 +86,14 @@ export function useConversationRouting(): { view: RouteView; navigateToFiles: ()
     setView("files");
   }, []);
 
-  // Called alongside `newChat()`/`loadConversation()` so the Files page is
-  // left immediately, even in the rare case the target contextId happens to
-  // match whatever was already active before navigating to `/files`.
+  const navigateToSettings = useCallback(() => {
+    if (window.location.pathname !== "/settings") window.history.pushState(null, "", "/settings");
+    setView("settings");
+  }, []);
+
+  // Called alongside `newChat()`/`loadConversation()` so the Files/Settings
+  // page is left immediately, even in the rare case the target contextId
+  // happens to match whatever was already active before navigating away.
   const navigateToChat = useCallback(() => {
     const { contextId: current } = useChatStore.getState();
     const target = current ? `/c/${current}` : "/";
@@ -89,5 +101,5 @@ export function useConversationRouting(): { view: RouteView; navigateToFiles: ()
     setView("chat");
   }, []);
 
-  return { view, navigateToFiles, navigateToChat };
+  return { view, navigateToFiles, navigateToSettings, navigateToChat };
 }

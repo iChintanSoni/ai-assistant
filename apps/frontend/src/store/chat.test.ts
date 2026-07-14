@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { useChatStore } from "./chat";
 import type { ModelInfo } from "../lib/models";
 
@@ -105,6 +105,13 @@ test("beginTurn appends a completed user turn and a streaming agent turn", () =>
   expect(s.turns).toHaveLength(2);
   expect(s.turns[0]).toMatchObject({ role: "user", text: "hello", status: "complete", documentIds: ["d1"] });
   expect(s.turns[1]).toMatchObject({ role: "agent", text: "", status: "streaming" });
+});
+
+test("beginTurn stamps the user turn's timestamp at send time; the agent turn has none yet", () => {
+  useChatStore.getState().beginTurn("hello", [], []);
+  const s = useChatStore.getState();
+  expect(s.turns[0]!.timestamp).toEqual(expect.any(Number));
+  expect(s.turns[1]!.timestamp).toBeUndefined();
 });
 
 test("beginTurn omits documentIds entirely when none are active", () => {
@@ -250,6 +257,24 @@ describe("finishTurn", () => {
     useChatStore.getState().finishTurn("failed", undefined, "it broke");
     expect(useChatStore.getState().turns.at(-1)!.error).toBe("it broke");
   });
+
+  test.each(["complete", "failed", "canceled"] as const)(
+    "stamps the agent turn's timestamp when it finishes as %s, overwriting any earlier value",
+    (status) => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(1_000);
+        useChatStore.getState().finishTurn(status);
+        expect(useChatStore.getState().turns.at(-1)!.timestamp).toBe(1_000);
+
+        vi.setSystemTime(5_000);
+        useChatStore.getState().finishTurn(status);
+        expect(useChatStore.getState().turns.at(-1)!.timestamp).toBe(5_000);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 });
 
 describe("HITL pause/resume", () => {

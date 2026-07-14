@@ -14,7 +14,7 @@ import { DocumentsPanel } from "./components/DocumentsPanel";
 import { DropOverlay } from "./components/DropOverlay";
 import { FilesPage } from "./components/FilesPage";
 import { HistoryPanel } from "./components/HistoryPanel";
-import { SettingsPanel } from "./components/SettingsPanel";
+import { SettingsPage } from "./components/SettingsPage";
 import { useAttachments } from "./hooks/useAttachments";
 import { useConversationRouting } from "./hooks/useConversationRouting";
 import { useFileDrop } from "./hooks/useFileDrop";
@@ -32,12 +32,10 @@ function App() {
   const historyButtonRef = useRef<HTMLButtonElement>(null);
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const documentsButtonRef = useRef<HTMLButtonElement>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const attachmentsState = useAttachments();
   const { isDraggingFiles, dropZoneProps } = useFileDrop(attachmentsState.addFiles);
 
-  const { view, navigateToFiles, navigateToChat } = useConversationRouting();
+  const { view, navigateToFiles, navigateToSettings, navigateToChat } = useConversationRouting();
 
   useEffect(() => {
     let active = true;
@@ -66,26 +64,22 @@ function App() {
         onToggleHistory={() => {
           setHistoryOpen((v) => !v);
           setDocumentsOpen(false);
-          setSettingsOpen(false);
         }}
         documentsButtonRef={documentsButtonRef}
         documentsOpen={documentsOpen}
         onToggleDocuments={() => {
           setDocumentsOpen((v) => !v);
           setHistoryOpen(false);
-          setSettingsOpen(false);
         }}
         filesOpen={view === "files"}
         onOpenFiles={() => {
           navigateToFiles();
           setHistoryOpen(false);
           setDocumentsOpen(false);
-          setSettingsOpen(false);
         }}
-        settingsButtonRef={settingsButtonRef}
-        settingsOpen={settingsOpen}
-        onToggleSettings={() => {
-          setSettingsOpen((v) => !v);
+        settingsOpen={view === "settings"}
+        onOpenSettings={() => {
+          navigateToSettings();
           setHistoryOpen(false);
           setDocumentsOpen(false);
         }}
@@ -101,15 +95,14 @@ function App() {
         onClose={() => setDocumentsOpen(false)}
         triggerRef={documentsButtonRef}
       />
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        triggerRef={settingsButtonRef}
-      />
 
       {view === "files" ? (
         <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-6">
           <FilesPage navigateToChat={navigateToChat} />
+        </main>
+      ) : view === "settings" ? (
+        <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-6">
+          <SettingsPage />
         </main>
       ) : (
         <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-6" {...dropZoneProps}>
@@ -173,9 +166,8 @@ function Sidebar({
   onToggleDocuments,
   filesOpen,
   onOpenFiles,
-  settingsButtonRef,
   settingsOpen,
-  onToggleSettings,
+  onOpenSettings,
 }: {
   onNewChat: () => void;
   historyButtonRef: React.RefObject<HTMLButtonElement | null>;
@@ -186,9 +178,8 @@ function Sidebar({
   onToggleDocuments: () => void;
   filesOpen: boolean;
   onOpenFiles: () => void;
-  settingsButtonRef: React.RefObject<HTMLButtonElement | null>;
   settingsOpen: boolean;
-  onToggleSettings: () => void;
+  onOpenSettings: () => void;
 }) {
   return (
     <nav className="relative z-20 flex h-full w-16 flex-col items-center justify-between py-6">
@@ -218,12 +209,7 @@ function Sidebar({
       </div>
 
       <div className="flex flex-col items-center gap-2">
-        <RailButton
-          ref={settingsButtonRef}
-          label="Settings"
-          onClick={onToggleSettings}
-          active={settingsOpen}
-        >
+        <RailButton label="Settings" onClick={onOpenSettings} active={settingsOpen}>
           <Cog6ToothIcon className="size-5" />
         </RailButton>
         <button

@@ -18,6 +18,7 @@ import type { Components } from "react-markdown";
 import { useChatStore } from "../store/chat";
 import type { LegacyUIAttachment, UIAttachment, UICompaction, UIToolCall, UITurn } from "../store/chat";
 import { useChat } from "../hooks/useChat";
+import { currentTimeMs, formatFullDateTime, formatMessageTime } from "../lib/format";
 import type { ApprovalRequest, Decision } from "../lib/envelope";
 
 const markdownComponents: Components = {
@@ -110,7 +111,13 @@ function Markdown({ text }: { text: string }) {
 }
 
 function fmt(value: unknown): string {
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
   try {
     return JSON.stringify(value, null, 2);
   } catch {
@@ -191,6 +198,19 @@ function extractPrompt(args: unknown): string | undefined {
   return typeof prompt === "string" && prompt ? prompt : undefined;
 }
 
+function GeneratedImage({ url, alt, caption }: { url: string; alt: string; caption?: string }) {
+  return (
+    <>
+      <img
+        src={url}
+        alt={alt}
+        className="max-h-105 w-full rounded-2xl bg-slate-100/60 object-contain ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/60"
+      />
+      {caption && <p className="px-1 text-xs text-slate-400 italic dark:text-slate-500">{caption}</p>}
+    </>
+  );
+}
+
 function SourceCard({ hit }: { hit: DocSearchHit }) {
   const isFigure = hit.text.startsWith("[Figure]");
   const excerpt = isFigure ? hit.text.slice("[Figure]".length).trim() : hit.text;
@@ -211,12 +231,11 @@ function ToolRow({ tool }: { tool: UIToolCall }) {
   const isViewPage = tool.name === "view_document_page";
   const isSearchDocs = tool.name === "search_documents";
   const isSummarize = tool.name === "summarize_document";
-  const [open, setOpen] = useState(isImageGen || isViewPage || isSearchDocs || isSummarize);
+  const [open, setOpen] = useState(isViewPage || isSearchDocs || isSummarize);
   const running = tool.status === "started";
-  const image = tool.status === "completed" && (isImageGen || isViewPage) ? parseImageResult(tool.output) : null;
+  const image = tool.status === "completed" && isViewPage ? parseImageResult(tool.output) : null;
   const searchHits = tool.status === "completed" && isSearchDocs ? parseSearchResults(tool.output) : null;
   const Icon = isImageGen || isViewPage ? PhotoIcon : isSearchDocs ? WrenchScrewdriverIcon : DocumentTextIcon;
-  const isDocTool = isImageGen || isViewPage || isSearchDocs || isSummarize;
 
   return (
     <div className="rounded-2xl bg-slate-50/70 p-3 ring-1 ring-slate-200/60 dark:bg-slate-900/60 dark:ring-slate-700/50">
@@ -236,10 +255,13 @@ function ToolRow({ tool }: { tool: UIToolCall }) {
       </button>
       {open && (
         <div className="mt-2 flex flex-col gap-2 text-xs">
-          {!isDocTool && tool.args !== undefined && (
-            <pre className="overflow-x-auto rounded-lg bg-white/70 p-2 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
-              {fmt(tool.args)}
-            </pre>
+          {tool.args !== undefined && (
+            <div>
+              <p className="mb-1 font-medium text-slate-500 dark:text-slate-400">Input</p>
+              <pre className="overflow-x-auto rounded-lg bg-white/70 p-2 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
+                {fmt(tool.args)}
+              </pre>
+            </div>
           )}
           {(isImageGen || isViewPage) && running && (
             <div
@@ -249,18 +271,7 @@ function ToolRow({ tool }: { tool: UIToolCall }) {
               <PhotoIcon className="size-8 text-slate-300 dark:text-slate-600" />
             </div>
           )}
-          {(isImageGen || isViewPage) && image && (
-            <>
-              <img
-                src={image.url}
-                alt={extractPrompt(tool.args) ?? "Document page"}
-                className="max-h-105 w-full rounded-2xl bg-slate-100/60 object-contain ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/60"
-              />
-              {isImageGen && extractPrompt(tool.args) && (
-                <p className="px-1 text-xs text-slate-400 italic dark:text-slate-500">{extractPrompt(tool.args)}</p>
-              )}
-            </>
-          )}
+          {isViewPage && image && <GeneratedImage url={image.url} alt={extractPrompt(tool.args) ?? "Document page"} />}
           {isSearchDocs && searchHits && searchHits.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {searchHits.map((hit, i) => (
@@ -273,10 +284,13 @@ function ToolRow({ tool }: { tool: UIToolCall }) {
               <Markdown text={tool.output} />
             </div>
           )}
-          {!isDocTool && (!isImageGen || (tool.status === "completed" && !image)) && tool.output !== undefined && (
-            <pre className="overflow-x-auto rounded-lg bg-white/70 p-2 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
-              {fmt(tool.output)}
-            </pre>
+          {tool.output !== undefined && (
+            <div>
+              <p className="mb-1 font-medium text-slate-500 dark:text-slate-400">Output</p>
+              <pre className="overflow-x-auto rounded-lg bg-white/70 p-2 text-slate-600 dark:bg-slate-950/50 dark:text-slate-400">
+                {fmt(tool.output)}
+              </pre>
+            </div>
           )}
         </div>
       )}
@@ -447,9 +461,60 @@ function AttachmentChip({ name, href }: { name: string; href?: string }) {
   );
 }
 
+function CopyButton({ text, label = "response" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      aria-label={copied ? "Copied" : `Copy ${label}`}
+      className="flex w-fit items-center gap-1 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:text-slate-200"
+    >
+      {copied ? <CheckIcon className="size-3.5" /> : <ClipboardDocumentIcon className="size-3.5" />}
+      <span>{copied ? "Copied" : "Copy"}</span>
+    </button>
+  );
+}
+
+/** Short clock time inline, full weekday/date/time via the native title tooltip on hover. */
+function Timestamp({ ts }: { ts?: number }) {
+  if (!ts) return null;
+  return (
+    <span className="text-xs text-slate-400 dark:text-slate-500" title={formatFullDateTime(ts)}>
+      {formatMessageTime(ts, currentTimeMs())}
+    </span>
+  );
+}
+
+/** Always-visible row of timestamp + copy button under a message. */
+function MessageFooter({
+  ts,
+  copyText,
+  copyLabel,
+  align = "start",
+}: {
+  ts?: number;
+  copyText?: string;
+  copyLabel?: string;
+  align?: "start" | "end";
+}) {
+  if (!ts && !copyText) return null;
+  return (
+    <div className={`flex items-center gap-2 px-1 ${align === "end" ? "justify-end" : "justify-start"}`}>
+      <Timestamp ts={ts} />
+      {copyText && <CopyButton text={copyText} label={copyLabel} />}
+    </div>
+  );
+}
+
 function UserTurn({ turn }: { turn: UITurn }) {
   return (
-    <div className="flex justify-end">
+    <div className="flex flex-col items-end gap-1">
       <div className="max-w-[85%] rounded-3xl bg-slate-100/80 px-4 py-2.5 text-slate-800 dark:bg-slate-800/80 dark:text-slate-100">
         {turn.text && <p className="whitespace-pre-wrap leading-relaxed">{turn.text}</p>}
         {turn.attachments && turn.attachments.length > 0 && (
@@ -464,32 +529,18 @@ function UserTurn({ turn }: { turn: UITurn }) {
           </div>
         )}
       </div>
+      <MessageFooter ts={turn.timestamp} copyText={turn.text || undefined} copyLabel="message" align="end" />
     </div>
-  );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-      aria-label={copied ? "Copied" : "Copy response"}
-      className="flex w-fit items-center gap-1 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:text-slate-200"
-    >
-      {copied ? <CheckIcon className="size-3.5" /> : <ClipboardDocumentIcon className="size-3.5" />}
-      <span>{copied ? "Copied" : "Copy"}</span>
-    </button>
   );
 }
 
 function AgentTurn({ turn }: { turn: UITurn }) {
   const idle = turn.status === "streaming" && !turn.text && !turn.reasoning && turn.tools.length === 0;
+  const canCopy = turn.status === "complete" || turn.status === "failed" || turn.status === "canceled";
+  const generatedImages = turn.tools
+    .filter((t) => t.name === "generate_image" && t.status === "completed")
+    .map((t) => ({ id: t.id, image: parseImageResult(t.output), prompt: extractPrompt(t.args) }))
+    .filter((x): x is { id: string; image: { url: string }; prompt: string | undefined } => x.image !== null);
   return (
     <div className="flex flex-col gap-3">
       {turn.reasoning && <ThinkingBlock text={turn.reasoning} streaming={turn.status === "streaming"} />}
@@ -520,7 +571,13 @@ function AgentTurn({ turn }: { turn: UITurn }) {
           {turn.status === "streaming" && <Caret />}
         </div>
       )}
-      {turn.status === "complete" && turn.text && <CopyButton text={turn.text} />}
+      {generatedImages.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {generatedImages.map(({ id, image, prompt }) => (
+            <GeneratedImage key={id} url={image.url} alt={prompt ?? "Generated image"} caption={prompt} />
+          ))}
+        </div>
+      )}
       {idle && (
         <p className="text-slate-400 dark:text-slate-500">
           Thinking
@@ -534,6 +591,7 @@ function AgentTurn({ turn }: { turn: UITurn }) {
       {turn.status === "input-required" && turn.approvals && turn.approvals.length > 0 && (
         <ApprovalCard requests={turn.approvals} />
       )}
+      <MessageFooter ts={turn.timestamp} copyText={canCopy && turn.text ? turn.text : undefined} />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { deleteAttachment, listAttachments, type AttachmentItem, type AttachmentKind } from "../lib/attachments";
 import { deleteDocument } from "../lib/documents";
+import { formatBytes } from "../lib/format";
 import { getConversation } from "../lib/history";
 import { useChatStore } from "../store/chat";
 
@@ -32,18 +33,6 @@ const KIND_LABEL: Record<AttachmentKind, string> = {
   attachment: "Uploaded",
   "generated-image": "Generated",
 };
-
-function formatSize(bytes: number): string {
-  if (!bytes || bytes <= 0) return "";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let i = 0;
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024;
-    i++;
-  }
-  return `${i > 0 && value < 10 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
-}
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -321,7 +310,7 @@ function FileTile({
       <div className="flex flex-col gap-0.5 p-3">
         <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{item.originalName}</p>
         <p className="truncate text-xs text-slate-400 dark:text-slate-500">
-          {[formatSize(item.size), formatDate(item.createdAt)].filter(Boolean).join(" • ")}
+          {[formatBytes(item.size), formatDate(item.createdAt)].filter(Boolean).join(" • ")}
         </p>
         {status && <p className="truncate text-xs text-amber-600 dark:text-amber-400">{status}</p>}
         {label &&
@@ -398,7 +387,7 @@ function ListView({
                   {KIND_LABEL[item.kind]}
                 </span>
                 <span className="hidden w-16 shrink-0 text-xs text-slate-400 sm:block dark:text-slate-500">
-                  {formatSize(item.size)}
+                  {formatBytes(item.size)}
                 </span>
                 <span className="w-24 shrink-0 text-xs text-slate-400 dark:text-slate-500">{formatDate(item.createdAt)}</span>
                 <span className="hidden w-32 shrink-0 truncate text-xs text-slate-400 md:block dark:text-slate-500" title={item.usedIn.map((c) => c.title).join(", ")}>

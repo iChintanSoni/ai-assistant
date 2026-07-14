@@ -19,12 +19,13 @@ import {
   getChunksInPageRange,
   updateDocumentSummary,
 } from "./documentStore.js";
+import { getDefaultModel } from "./models.js";
 
 const MAP_TOKEN_BUDGET = 1500;
 const REDUCE_TOKEN_BUDGET = 2000;
 
 async function summarizeText(prompt: string): Promise<string> {
-  const chat = new ChatOllama({ model: config.defaultModel, baseUrl: config.ollamaBaseUrl });
+  const chat = new ChatOllama({ model: getDefaultModel(), baseUrl: config.ollamaBaseUrl });
   const response = await chat.invoke([{ role: "user", content: prompt }]);
   const raw = typeof response.content === "string" ? response.content : String(response.content);
   return raw.trim();

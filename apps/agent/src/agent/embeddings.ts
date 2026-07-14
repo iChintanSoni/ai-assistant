@@ -1,5 +1,6 @@
 /** Ollama /api/embed wrapper for document chunk + query embeddings. */
 import { config } from "../config.js";
+import { getEmbeddingModel } from "./models.js";
 
 interface EmbedResponse {
   embeddings?: number[][];
@@ -9,16 +10,17 @@ interface EmbedResponse {
 /** Embeds a batch of strings in one request. Order of results matches order of input. */
 export async function embed(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
+  const model = getEmbeddingModel();
   const res = await fetch(`${config.ollamaBaseUrl}/api/embed`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: config.embeddingModel, input: texts }),
+    body: JSON.stringify({ model, input: texts }),
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as EmbedResponse | null;
     throw new Error(
       `Embedding request failed (HTTP ${res.status}): ${body?.error ?? "unknown error"}. ` +
-        `Make sure "${config.embeddingModel}" is pulled (ollama pull ${config.embeddingModel}).`,
+        `Make sure "${model}" is pulled (ollama pull ${model}).`,
     );
   }
   const data = (await res.json()) as EmbedResponse;

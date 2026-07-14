@@ -6,10 +6,9 @@ import { A2APublisher } from "./publisher.js";
 import { runAgentToEvents, type HITLRequestValue, type TurnUsage } from "./streaming.js";
 import type { ApprovalRequest, Envelope } from "./envelope.js";
 import { buildAgent } from "../agent/deepAgent.js";
-import { describeModel } from "../agent/models.js";
+import { describeModel, getDefaultModel } from "../agent/models.js";
 import { extractDocumentIds, extractModel, prependNote, toLangChainContent, validateParts } from "../agent/parts.js";
 import { getDocumentsByIds } from "../agent/documentStore.js";
-import { config } from "../config.js";
 
 interface RunRecord {
   controller: AbortController;
@@ -77,7 +76,7 @@ export class DeepAgentExecutor implements AgentExecutor {
     try {
       const decisions = extractDecisions(userMessage);
       const isResume = decisions !== null;
-      const modelName = extractModel(userMessage) ?? config.defaultModel;
+      const modelName = extractModel(userMessage) ?? getDefaultModel();
 
       // For a fresh turn: validate the model + uploads, and open the task.
       // For a resume: the task already exists and its thread state is checkpointed.

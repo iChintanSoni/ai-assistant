@@ -3,6 +3,7 @@ import { buildApp } from "./server/app.js";
 import { startFileCleanup } from "./agent/fileCleanup.js";
 import { reconcileStuckDocuments } from "./agent/documentIngest.js";
 import { backfillAttachmentsIndex } from "./agent/attachmentsStore.js";
+import { getDefaultModel, getImageGenModel } from "./agent/models.js";
 import { config } from "./config.js";
 
 const app = buildApp();
@@ -15,7 +16,9 @@ const server = app.listen(config.port, () => {
   console.log(`[agent]   agent card : ${config.publicUrl}/.well-known/agent-card.json`);
   console.log(`[agent]   json-rpc   : ${config.publicUrl}/a2a`);
   console.log(`[agent]   models     : ${config.publicUrl}/models`);
-  console.log(`[agent]   ollama     : ${config.ollamaBaseUrl} (default model: ${config.defaultModel})`);
+  console.log(
+    `[agent]   ollama     : ${config.ollamaBaseUrl} (default model: ${getDefaultModel()}, image-gen model: ${getImageGenModel()})`,
+  );
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {

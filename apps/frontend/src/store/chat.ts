@@ -60,6 +60,10 @@ export interface UITurn {
   /** Cumulative conversation total as of this turn (not a sum across turns — Ollama
    * resends the whole growing history each call, so the latest snapshot IS the total). */
   usage?: TurnUsage;
+  /** Epoch ms. User turns get this at send time; agent turns get it when they actually
+   * finish (finishTurn) rather than when streaming started. Absent on turns persisted
+   * before this field existed — render as "no timestamp", not an error. */
+  timestamp?: number;
 }
 
 interface ChatState {
@@ -185,6 +189,7 @@ export const useChatStore = create<ChatState>((set) => ({
           status: "complete",
           attachments,
           documentIds: documentIds.length > 0 ? documentIds : undefined,
+          timestamp: Date.now(),
         },
         {
           id: crypto.randomUUID(),
@@ -280,6 +285,7 @@ export const useChatStore = create<ChatState>((set) => ({
         status,
         text: finalText && finalText.trim() ? finalText : t.text,
         error: error ?? t.error,
+        timestamp: Date.now(),
       })),
     })),
 

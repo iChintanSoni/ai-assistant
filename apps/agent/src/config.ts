@@ -19,6 +19,8 @@ export const config = {
   // give real headroom on top of that plus the file-storage upload.
   imageGenTimeoutMs: Number(process.env.IMAGE_GEN_TIMEOUT_MS ?? 240000),
   fileStorageBaseUrl: (process.env.FILE_STORAGE_BASE_URL ?? "http://localhost:6060").replace(/\/$/, ""),
+  // Orphan file-storage sweep (startup + every 6h). Disable if you manage cleanup yourself.
+  fileCleanupEnabled: process.env.FILE_CLEANUP_ENABLED !== "false",
   // Document ingestion: Docling (Python, external to this Node process) converts
   // uploads to structured JSON. Defaults to the pyenv 3.12.10 install where it was
   // confirmed present locally — override if your install lives elsewhere.

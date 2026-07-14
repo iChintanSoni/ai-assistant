@@ -23,6 +23,12 @@ vi.mock("./lib/documents", async (importOriginal) => {
   };
 });
 vi.mock("./lib/attachments", () => ({ listAttachments: vi.fn().mockResolvedValue([]), deleteAttachment: vi.fn() }));
+vi.mock("./lib/modelManagement", () => ({
+  fetchAllModels: vi.fn().mockResolvedValue({ models: [], defaultModel: "m1" }),
+  setDefaultModel: vi.fn(),
+  deleteModel: vi.fn(),
+  pullModel: vi.fn(),
+}));
 vi.mock("./hooks/useChat", () => ({ useChat: vi.fn(() => ({ send: vi.fn(), respond: vi.fn(), stop: vi.fn() })) }));
 
 import { fetchModels } from "./lib/models";
@@ -90,11 +96,13 @@ test("History and Documents panel toggles are mutually exclusive", async () => {
   expect(screen.getByRole("dialog", { name: "Document library" })).toBeInTheDocument();
 });
 
-test("the Settings rail button opens the settings panel", async () => {
+test("the Settings rail button switches to the Settings page, and New chat switches back", async () => {
   const user = userEvent.setup();
   render(<App />);
 
   await user.click(screen.getByRole("button", { name: "Settings" }));
+  expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
 
-  expect(screen.getByRole("dialog", { name: "Settings" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "New chat" }));
+  expect(screen.queryByRole("heading", { name: "Settings" })).not.toBeInTheDocument();
 });

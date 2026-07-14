@@ -5,7 +5,18 @@ import { DefaultRequestHandler, InMemoryTaskStore } from "@a2a-js/sdk/server";
 import { agentCardHandler, jsonRpcHandler, UserBuilder } from "@a2a-js/sdk/server/express";
 import { DeepAgentExecutor } from "./executor.js";
 import { buildAgentCard } from "./agentCard.js";
-import { listModels } from "../agent/models.js";
+import {
+  deleteModel,
+  getDefaultModel,
+  getEmbeddingModel,
+  getImageGenModel,
+  listAllModels,
+  listModels,
+  pullModel,
+  setDefaultModel,
+  setEmbeddingModel,
+  setImageGenModel,
+} from "../agent/models.js";
 import {
   deleteConversation,
   getConversation,
@@ -43,12 +54,102 @@ export function buildApp(): express.Express {
   app.get("/models", async (_req, res) => {
     try {
       const models = await listModels();
-      res.json({ models, defaultModel: config.defaultModel });
+      res.json({ models, defaultModel: getDefaultModel() });
     } catch (err) {
       res.status(502).json({
         error: "Could not reach Ollama",
         detail: err instanceof Error ? err.message : String(err),
       });
+    }
+  });
+
+  // Model management (Settings page) — every local model, unfiltered, plus
+  // download/delete/set-default. Separate from /models above, which stays
+  // scoped to chat-eligible models for the composer's selector.
+  app.get("/ollama/models", async (_req, res) => {
+    try {
+      const models = await listAllModels();
+      res.json({
+        models,
+        defaultModel: getDefaultModel(),
+        imageGenModel: getImageGenModel(),
+        embeddingModel: getEmbeddingModel(),
+      });
+    } catch (err) {
+      res.status(502).json({
+        error: "Could not reach Ollama",
+        detail: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
+  app.put("/ollama/default-model", async (req, res) => {
+    const { model } = req.body as { model?: unknown };
+    if (typeof model !== "string" || !model) {
+      res.status(400).json({ error: "Expected { model: string }" });
+      return;
+    }
+    try {
+      await setDefaultModel(model);
+      res.status(204).end();
+    } catch (err) {
+      res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.put("/ollama/image-gen-model", async (req, res) => {
+    const { model } = req.body as { model?: unknown };
+    if (typeof model !== "string" || !model) {
+      res.status(400).json({ error: "Expected { model: string }" });
+      return;
+    }
+    try {
+      await setImageGenModel(model);
+      res.status(204).end();
+    } catch (err) {
+      res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  app.put("/ollama/embedding-model", async (req, res) => {
+    const { model } = req.body as { model?: unknown };
+    if (typeof model !== "string" || !model) {
+      res.status(400).json({ error: "Expected { model: string }" });
+      return;
+    }
+    try {
+      await setEmbeddingModel(model);
+      res.status(204).end();
+    } catch (err) {
+      res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // Streams Ollama's NDJSON pull progress straight through to the client, one
+  // JSON object per line. A mid-stream failure can't change the already-sent
+  // 200, so it's written as a final `{error}` line instead.
+  app.post("/ollama/pull", async (req, res) => {
+    const { model } = req.body as { model?: unknown };
+    if (typeof model !== "string" || !model) {
+      res.status(400).json({ error: "Expected { model: string }" });
+      return;
+    }
+    res.setHeader("content-type", "application/x-ndjson");
+    try {
+      await pullModel(model, (evt) => res.write(`${JSON.stringify(evt)}\n`));
+    } catch (err) {
+      res.write(`${JSON.stringify({ status: "error", error: err instanceof Error ? err.message : String(err) })}\n`);
+    } finally {
+      res.end();
+    }
+  });
+
+  app.delete("/ollama/models/:name", async (req, res) => {
+    try {
+      await deleteModel(req.params.name);
+      res.status(204).end();
+    } catch (err) {
+      res.status(404).json({ error: err instanceof Error ? err.message : String(err) });
     }
   });
 

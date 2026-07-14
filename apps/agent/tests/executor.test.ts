@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 vi.mock("../src/agent/deepAgent.js", () => ({ buildAgent: vi.fn() }));
-vi.mock("../src/agent/models.js", () => ({ describeModel: vi.fn() }));
+vi.mock("../src/agent/models.js", () => ({ describeModel: vi.fn(), getDefaultModel: vi.fn(() => "default-model") }));
 vi.mock("../src/server/streaming.js", () => ({ runAgentToEvents: vi.fn() }));
 vi.mock("../src/agent/documentStore.js", () => ({ getDocumentsByIds: vi.fn(() => []) }));
 

@@ -6,6 +6,7 @@ vi.mock("../hooks/useChat", () => ({ useChat: vi.fn() }));
 
 import { useChat } from "../hooks/useChat";
 import { useChatStore, type UITurn } from "../store/chat";
+import { formatFullDateTime, formatMessageTime } from "../lib/format";
 import { Conversation } from "./Conversation";
 
 function userTurn(overrides: Partial<UITurn> = {}): UITurn {
@@ -84,6 +85,78 @@ test("shows a canceled/failed status message", () => {
   expect(screen.getByText("boom")).toBeInTheDocument();
 });
 
+test("failed/canceled turns show a copy button only when partial text streamed in", () => {
+  useChatStore.setState({ turns: [agentTurn({ status: "failed", error: "boom", text: "" })] });
+  const { rerender } = render(<Conversation />);
+  expect(screen.queryByRole("button", { name: /copy response/i })).not.toBeInTheDocument();
+
+  useChatStore.setState({ turns: [agentTurn({ status: "failed", error: "boom", text: "partial answer" })] });
+  rerender(<Conversation />);
+  expect(screen.getByRole("button", { name: /copy response/i })).toBeInTheDocument();
+
+  useChatStore.setState({ turns: [agentTurn({ status: "canceled", text: "" })] });
+  rerender(<Conversation />);
+  expect(screen.queryByRole("button", { name: /copy response/i })).not.toBeInTheDocument();
+
+  useChatStore.setState({ turns: [agentTurn({ status: "canceled", text: "partial answer" })] });
+  rerender(<Conversation />);
+  expect(screen.getByRole("button", { name: /copy response/i })).toBeInTheDocument();
+});
+
+test("agent copy button copies the raw markdown text to the clipboard", async () => {
+  useChatStore.setState({ turns: [agentTurn({ status: "complete", text: "**bold answer**" })] });
+  const user = userEvent.setup();
+  render(<Conversation />);
+
+  await user.click(screen.getByRole("button", { name: /copy response/i }));
+
+  await expect(navigator.clipboard.readText()).resolves.toBe("**bold answer**");
+});
+
+test("user turn shows a copy button that copies exactly the typed text, not markdown-rendered", async () => {
+  useChatStore.setState({ turns: [userTurn({ text: "**not bold**, just typed" })] });
+  const user = userEvent.setup();
+  render(<Conversation />);
+
+  const button = screen.getByRole("button", { name: /copy message/i });
+  await user.click(button);
+
+  await expect(navigator.clipboard.readText()).resolves.toBe("**not bold**, just typed");
+});
+
+test("a user turn with only attachments (no text) shows no copy button", () => {
+  useChatStore.setState({
+    turns: [userTurn({ text: "", attachments: [{ name: "a.png", url: "http://x/a.png", mimeType: "image/png", size: 1 }] })],
+  });
+  render(<Conversation />);
+  expect(screen.queryByRole("button", { name: /copy message/i })).not.toBeInTheDocument();
+});
+
+test("renders an absolute timestamp (with a full-date tooltip) when the turn has one, and none for legacy turns without it", () => {
+  const ts = Date.now();
+  useChatStore.setState({
+    turns: [userTurn({ text: "hi", timestamp: ts }), agentTurn({ status: "complete", text: "hello" })],
+  });
+  render(<Conversation />);
+
+  const label = screen.getByText(formatMessageTime(ts, Date.now()));
+  expect(label).toHaveAttribute("title", formatFullDateTime(ts));
+
+  // The agent turn has no `timestamp` (simulating a pre-feature persisted conversation) — its
+  // copy button still renders, just with no timestamp label alongside it.
+  expect(screen.getByRole("button", { name: /copy response/i })).toBeInTheDocument();
+});
+
+test("timestamp and copy are always visible, not hover-gated", () => {
+  useChatStore.setState({
+    turns: [agentTurn({ status: "complete", text: "hello", timestamp: Date.now() })],
+  });
+  render(<Conversation />);
+  const button = screen.getByRole("button", { name: /copy response/i });
+  expect(button.className).not.toMatch(/opacity-0/);
+  expect(button.parentElement?.className ?? "").not.toMatch(/opacity-0/);
+});
+
 test("renders a generic tool call's args and output as raw JSON once expanded", async () => {
   useChatStore.setState({
     turns: [agentTurn({ tools: [{ id: "t1", name: "web_search", args: { query: "cats" }, output: "some result", status: "completed" }] })],
@@ -106,16 +179,17 @@ test("a running tool shows 'running…' status", () => {
   expect(screen.getByText("running…")).toBeInTheDocument();
 });
 
-test("renders a generate_image tool's result as an image with its prompt caption", () => {
+test("renders a generate_image tool's result inline with the reply text, and its tool row stays compact with raw input/output", async () => {
   useChatStore.setState({
     turns: [
       agentTurn({
+        text: "Here's an image of a fox in snow.",
         tools: [
           {
             id: "t1",
             name: "generate_image",
-            args: { prompt: "a fox in snow" },
-            output: JSON.stringify({ url: "http://files/fox.png" }),
+            args: { prompt: "a fox in snow", width: 512 },
+            output: JSON.stringify({ url: "http://files/fox.png", prompt: "a fox in snow" }),
             status: "completed",
           },
         ],
@@ -123,11 +197,21 @@ test("renders a generate_image tool's result as an image with its prompt caption
     ],
   });
   render(<Conversation />);
+
+  // Image renders as part of the reply, not inside the (collapsed by default) tool row.
   expect(screen.getByAltText("a fox in snow")).toHaveAttribute("src", "http://files/fox.png");
   expect(screen.getByText("a fox in snow")).toBeInTheDocument();
+  expect(screen.getByText(/here's an image of a fox in snow/i)).toBeInTheDocument();
+
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /generate_image/i }));
+  expect(screen.getByText("Input")).toBeInTheDocument();
+  expect(screen.getByText(/"width": 512/)).toBeInTheDocument();
+  expect(screen.getByText("Output")).toBeInTheDocument();
+  expect(screen.getByText(/"url": "http:\/\/files\/fox.png"/)).toBeInTheDocument();
 });
 
-test("renders search_documents results as source cards", () => {
+test("renders search_documents results as source cards, plus raw input/output", () => {
   const hits = [{ documentId: "d1", documentName: "report.pdf", page: "3", text: "relevant excerpt" }];
   useChatStore.setState({
     turns: [agentTurn({ tools: [{ id: "t1", name: "search_documents", args: { query: "q" }, output: JSON.stringify(hits), status: "completed" }] })],
@@ -136,14 +220,46 @@ test("renders search_documents results as source cards", () => {
   expect(screen.getByText("report.pdf")).toBeInTheDocument();
   expect(screen.getByText("relevant excerpt")).toBeInTheDocument();
   expect(screen.getByText("p.3")).toBeInTheDocument();
+  expect(screen.getByText("Input")).toBeInTheDocument();
+  expect(screen.getByText(/"query": "q"/)).toBeInTheDocument();
+  expect(screen.getByText("Output")).toBeInTheDocument();
+  expect(screen.getByText(/"documentName": "report.pdf"/)).toBeInTheDocument();
 });
 
-test("renders summarize_document output as markdown", () => {
+test("renders summarize_document output as markdown, plus raw input/output", () => {
   useChatStore.setState({
-    turns: [agentTurn({ tools: [{ id: "t1", name: "summarize_document", args: {}, output: "A **summary**.", status: "completed" }] })],
+    turns: [agentTurn({ tools: [{ id: "t1", name: "summarize_document", args: { documentId: "d1" }, output: "A **summary**.", status: "completed" }] })],
   });
   render(<Conversation />);
   expect(screen.getByText("summary")).toBeInTheDocument();
+  expect(screen.getByText("Input")).toBeInTheDocument();
+  expect(screen.getByText(/"documentId": "d1"/)).toBeInTheDocument();
+  expect(screen.getByText("Output")).toBeInTheDocument();
+  expect(screen.getByText("A **summary**.")).toBeInTheDocument();
+});
+
+test("renders view_document_page's image in the tool row, plus raw input/output", () => {
+  useChatStore.setState({
+    turns: [
+      agentTurn({
+        tools: [
+          {
+            id: "t1",
+            name: "view_document_page",
+            args: { documentId: "d1", page: 3 },
+            output: JSON.stringify({ url: "http://files/page3.png", documentName: "report.pdf", page: 3 }),
+            status: "completed",
+          },
+        ],
+      }),
+    ],
+  });
+  render(<Conversation />);
+  expect(screen.getByAltText("Document page")).toHaveAttribute("src", "http://files/page3.png");
+  expect(screen.getByText("Input")).toBeInTheDocument();
+  expect(screen.getByText(/"documentId": "d1"/)).toBeInTheDocument();
+  expect(screen.getByText("Output")).toBeInTheDocument();
+  expect(screen.getByText(/"documentName": "report.pdf"/)).toBeInTheDocument();
 });
 
 test("renders a subagent delegation row", () => {

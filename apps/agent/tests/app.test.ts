@@ -1,7 +1,18 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import request from "supertest";
 
-vi.mock("../src/agent/models.js", () => ({ listModels: vi.fn() }));
+vi.mock("../src/agent/models.js", () => ({
+  listModels: vi.fn(),
+  listAllModels: vi.fn(),
+  getDefaultModel: vi.fn(() => "default-model"),
+  setDefaultModel: vi.fn(),
+  getImageGenModel: vi.fn(() => "image-gen-model"),
+  setImageGenModel: vi.fn(),
+  getEmbeddingModel: vi.fn(() => "embedding-model"),
+  setEmbeddingModel: vi.fn(),
+  pullModel: vi.fn(),
+  deleteModel: vi.fn(),
+}));
 vi.mock("../src/agent/historyStore.js", () => ({
   deleteConversation: vi.fn(),
   getConversation: vi.fn(),
@@ -29,7 +40,18 @@ vi.mock("../src/agent/attachmentsStore.js", () => ({
   upsertAttachment: vi.fn(),
 }));
 
-import { listModels } from "../src/agent/models.js";
+import {
+  deleteModel,
+  getDefaultModel,
+  getEmbeddingModel,
+  getImageGenModel,
+  listAllModels,
+  listModels,
+  pullModel,
+  setDefaultModel,
+  setEmbeddingModel,
+  setImageGenModel,
+} from "../src/agent/models.js";
 import {
   deleteConversation,
   getConversation,
@@ -58,6 +80,15 @@ const app = buildApp();
 
 beforeEach(() => {
   vi.mocked(listModels).mockReset();
+  vi.mocked(listAllModels).mockReset();
+  vi.mocked(getDefaultModel).mockReset().mockReturnValue("default-model");
+  vi.mocked(setDefaultModel).mockReset();
+  vi.mocked(getImageGenModel).mockReset().mockReturnValue("image-gen-model");
+  vi.mocked(setImageGenModel).mockReset();
+  vi.mocked(getEmbeddingModel).mockReset().mockReturnValue("embedding-model");
+  vi.mocked(setEmbeddingModel).mockReset();
+  vi.mocked(pullModel).mockReset();
+  vi.mocked(deleteModel).mockReset();
   vi.mocked(listConversations).mockReset().mockReturnValue([]);
   vi.mocked(getConversation).mockReset();
   vi.mocked(upsertConversation).mockReset();
@@ -87,7 +118,7 @@ test("GET /models returns the model list + default model on success", async () =
   vi.mocked(listModels).mockResolvedValue([{ name: "m1", modalities: ["text"], tools: true, thinking: false, contextLength: null }]);
   const res = await request(app).get("/models");
   expect(res.status).toBe(200);
-  expect(res.body).toEqual({ models: [{ name: "m1", modalities: ["text"], tools: true, thinking: false, contextLength: null }], defaultModel: config.defaultModel });
+  expect(res.body).toEqual({ models: [{ name: "m1", modalities: ["text"], tools: true, thinking: false, contextLength: null }], defaultModel: "default-model" });
 });
 
 test("GET /models returns 502 when Ollama can't be reached", async () => {
@@ -95,6 +126,140 @@ test("GET /models returns 502 when Ollama can't be reached", async () => {
   const res = await request(app).get("/models");
   expect(res.status).toBe(502);
   expect(res.body.error).toMatch(/Could not reach Ollama/);
+});
+
+// --- /ollama/models, /ollama/default-model, /ollama/pull, /ollama/models/:name --
+
+test("GET /ollama/models returns every local model + default model on success", async () => {
+  const summary = {
+    name: "m1",
+    size: 123,
+    modifiedAt: null,
+    family: null,
+    parameterSize: null,
+    quantizationLevel: null,
+    capabilities: ["completion"],
+    contextLength: null,
+  };
+  vi.mocked(listAllModels).mockResolvedValue([summary]);
+  const res = await request(app).get("/ollama/models");
+  expect(res.status).toBe(200);
+  expect(res.body).toEqual({
+    models: [summary],
+    defaultModel: "default-model",
+    imageGenModel: "image-gen-model",
+    embeddingModel: "embedding-model",
+  });
+});
+
+test("GET /ollama/models returns 502 when Ollama can't be reached", async () => {
+  vi.mocked(listAllModels).mockRejectedValue(new Error("ECONNREFUSED"));
+  const res = await request(app).get("/ollama/models");
+  expect(res.status).toBe(502);
+  expect(res.body.error).toMatch(/Could not reach Ollama/);
+});
+
+test("PUT /ollama/default-model sets the default and returns 204", async () => {
+  vi.mocked(setDefaultModel).mockResolvedValue(undefined);
+  const res = await request(app).put("/ollama/default-model").send({ model: "m1" });
+  expect(res.status).toBe(204);
+  expect(setDefaultModel).toHaveBeenCalledWith("m1");
+});
+
+test("PUT /ollama/default-model returns 400 for a missing model field", async () => {
+  const res = await request(app).put("/ollama/default-model").send({});
+  expect(res.status).toBe(400);
+  expect(setDefaultModel).not.toHaveBeenCalled();
+});
+
+test("PUT /ollama/default-model returns 404 when the model isn't installed", async () => {
+  vi.mocked(setDefaultModel).mockRejectedValue(new Error("not installed"));
+  const res = await request(app).put("/ollama/default-model").send({ model: "missing" });
+  expect(res.status).toBe(404);
+  expect(res.body.error).toBe("not installed");
+});
+
+test("PUT /ollama/image-gen-model sets the image-gen default and returns 204", async () => {
+  vi.mocked(setImageGenModel).mockResolvedValue(undefined);
+  const res = await request(app).put("/ollama/image-gen-model").send({ model: "m1" });
+  expect(res.status).toBe(204);
+  expect(setImageGenModel).toHaveBeenCalledWith("m1");
+});
+
+test("PUT /ollama/image-gen-model returns 400 for a missing model field", async () => {
+  const res = await request(app).put("/ollama/image-gen-model").send({});
+  expect(res.status).toBe(400);
+  expect(setImageGenModel).not.toHaveBeenCalled();
+});
+
+test("PUT /ollama/image-gen-model returns 404 when the model isn't installed or lacks the image capability", async () => {
+  vi.mocked(setImageGenModel).mockRejectedValue(new Error("not an image-generation model"));
+  const res = await request(app).put("/ollama/image-gen-model").send({ model: "chat-model" });
+  expect(res.status).toBe(404);
+  expect(res.body.error).toBe("not an image-generation model");
+});
+
+test("PUT /ollama/embedding-model sets the embedding default and returns 204", async () => {
+  vi.mocked(setEmbeddingModel).mockResolvedValue(undefined);
+  const res = await request(app).put("/ollama/embedding-model").send({ model: "m1" });
+  expect(res.status).toBe(204);
+  expect(setEmbeddingModel).toHaveBeenCalledWith("m1");
+});
+
+test("PUT /ollama/embedding-model returns 400 for a missing model field", async () => {
+  const res = await request(app).put("/ollama/embedding-model").send({});
+  expect(res.status).toBe(400);
+  expect(setEmbeddingModel).not.toHaveBeenCalled();
+});
+
+test("PUT /ollama/embedding-model returns 404 when the model isn't installed or lacks the embedding capability", async () => {
+  vi.mocked(setEmbeddingModel).mockRejectedValue(new Error("not an embedding model"));
+  const res = await request(app).put("/ollama/embedding-model").send({ model: "chat-model" });
+  expect(res.status).toBe(404);
+  expect(res.body.error).toBe("not an embedding model");
+});
+
+test("POST /ollama/pull streams NDJSON progress lines and ends the response", async () => {
+  vi.mocked(pullModel).mockImplementation(async (_name, onProgress) => {
+    onProgress({ status: "pulling manifest" });
+    onProgress({ status: "success" });
+  });
+  const res = await request(app).post("/ollama/pull").send({ model: "m1" });
+  expect(res.status).toBe(200);
+  const lines = res.text.trim().split("\n").map((l) => JSON.parse(l));
+  expect(lines).toEqual([{ status: "pulling manifest" }, { status: "success" }]);
+});
+
+test("POST /ollama/pull writes a final error line when the pull fails mid-stream", async () => {
+  vi.mocked(pullModel).mockImplementation(async (_name, onProgress) => {
+    onProgress({ status: "pulling manifest" });
+    throw new Error("disk full");
+  });
+  const res = await request(app).post("/ollama/pull").send({ model: "m1" });
+  expect(res.status).toBe(200);
+  const lines = res.text.trim().split("\n").map((l) => JSON.parse(l));
+  expect(lines[0]).toEqual({ status: "pulling manifest" });
+  expect(lines[1]).toEqual({ status: "error", error: "disk full" });
+});
+
+test("POST /ollama/pull returns 400 for a missing model field", async () => {
+  const res = await request(app).post("/ollama/pull").send({});
+  expect(res.status).toBe(400);
+  expect(pullModel).not.toHaveBeenCalled();
+});
+
+test("DELETE /ollama/models/:name deletes the model and returns 204", async () => {
+  vi.mocked(deleteModel).mockResolvedValue(undefined);
+  const res = await request(app).delete(`/ollama/models/${encodeURIComponent("x/y:latest")}`);
+  expect(res.status).toBe(204);
+  expect(deleteModel).toHaveBeenCalledWith("x/y:latest");
+});
+
+test("DELETE /ollama/models/:name returns 404 when the model doesn't exist", async () => {
+  vi.mocked(deleteModel).mockRejectedValue(new Error("not found"));
+  const res = await request(app).delete("/ollama/models/missing");
+  expect(res.status).toBe(404);
+  expect(res.body.error).toBe("not found");
 });
 
 // --- /conversations -----------------------------------------------------------

@@ -78,6 +78,7 @@ const SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 /** Runs once at startup, then on a fixed interval. Call once from index.ts. */
 export function startFileCleanup(): void {
+  if (!config.fileCleanupEnabled) return;
   void sweepOrphanFiles();
   setInterval(() => void sweepOrphanFiles(), SWEEP_INTERVAL_MS).unref();
 }
