@@ -1,5 +1,5 @@
 /**
- * Shared attachment intake: used by both the paperclip file picker and
+ * Shared attachment intake: used by both the plus-button file picker and
  * drag-and-drop. Documents are uploaded + registered immediately (as today);
  * other files (image/audio) are staged locally until the message is sent.
  * Enforces MAX_ATTACHMENTS across documents-active-in-conversation + staged

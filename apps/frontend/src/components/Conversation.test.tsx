@@ -22,7 +22,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 
-test("renders a user turn's text and attachments (image, chip, legacy string)", () => {
+test("renders a user turn's text and opens previewable attachments in-app", async () => {
   useChatStore.setState({
     turns: [
       userTurn({
@@ -36,6 +36,7 @@ test("renders a user turn's text and attachments (image, chip, legacy string)", 
     ],
   });
 
+  const user = userEvent.setup();
   render(<Conversation />);
 
   expect(screen.getByText("check this out")).toBeInTheDocument();
@@ -43,13 +44,14 @@ test("renders a user turn's text and attachments (image, chip, legacy string)", 
   expect(screen.getByText("notes.pdf")).toBeInTheDocument();
   expect(screen.getByText("legacy-plain.txt")).toBeInTheDocument();
 
-  const imageLink = screen.getByRole("link", { name: "Open photo.png" });
-  expect(imageLink).toHaveAttribute("href", "http://files/photo.png");
-  expect(imageLink).toHaveAttribute("target", "_blank");
+  await user.click(screen.getByRole("button", { name: "Open photo.png" }));
+  expect(screen.getByRole("dialog", { name: "Preview photo.png" })).toBeInTheDocument();
+  expect(screen.getAllByAltText("photo.png").at(-1)).toHaveAttribute("src", "http://files/photo.png");
+  await user.click(screen.getByRole("button", { name: "Close attachment preview" }));
 
-  const chipLink = screen.getByText("notes.pdf").closest("a");
-  expect(chipLink).toHaveAttribute("href", "http://files/notes.pdf");
-  expect(chipLink).toHaveAttribute("target", "_blank");
+  await user.click(screen.getByRole("button", { name: /notes.pdf/i }));
+  expect(screen.getByRole("dialog", { name: "Preview notes.pdf" })).toBeInTheDocument();
+  expect(screen.getByTitle("notes.pdf")).toHaveAttribute("src", "http://files/notes.pdf");
 });
 
 test("renders agent markdown text with a copy button once complete, none while streaming", () => {

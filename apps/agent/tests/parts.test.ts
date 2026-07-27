@@ -88,7 +88,7 @@ test("toLangChainContent keeps multiple blocks as an array instead of collapsing
   expect((result as { type: string }[]).map((b) => b.type)).toEqual(["text", "text"]);
 });
 
-test("toLangChainContent inlines a bytes file part as a data URL", async () => {
+test("toLangChainContent turns an image-only message into an image block", async () => {
   const parts: Part[] = [{ kind: "file", file: { mimeType: "image/png", bytes: "QUJD" } }];
   const result = await toLangChainContent(parts);
   expect(result).toEqual([{ type: "image_url", image_url: "data:image/png;base64,QUJD" }]);

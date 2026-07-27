@@ -1,4 +1,4 @@
-/** Chip strip above the Composer: documents active in this conversation, plus files staged to send next. */
+/** Attachment preview tray inside the Composer. */
 import { useEffect, useRef, useState } from "react";
 import {
   DocumentTextIcon,
@@ -9,6 +9,8 @@ import {
 import { getDocument, type DocumentSummary } from "../lib/documents";
 import { useChatStore } from "../store/chat";
 import type { PendingAttachment } from "../hooks/useAttachments";
+import { canPreviewAttachment, type ViewableAttachment } from "../lib/attachmentPreview";
+import { AttachmentViewer } from "./AttachmentViewer";
 
 const POLL_MS = 1500;
 
@@ -20,13 +22,14 @@ interface ChatFilesProps {
   removeAttachment: (index: number) => void;
 }
 
-function Chip({
+function AttachmentTile({
   icon,
   image,
   name,
   detail,
   detailClassName,
   title,
+  onOpen,
   onRemove,
 }: {
   icon?: React.ReactNode;
@@ -35,39 +38,72 @@ function Chip({
   detail?: string;
   detailClassName?: string;
   title?: string;
+  onOpen?: () => void;
   onRemove: () => void;
 }) {
-  return (
-    <span
-      title={title}
-      className="flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1 pr-1.5 pl-2.5 text-xs text-slate-600 ring-1 ring-slate-200/70 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/60"
-    >
+  const preview = (
+    <>
       {image ? (
         <img
           src={image}
           alt=""
-          className="size-4 shrink-0 rounded-full object-cover"
+          className="size-full object-cover"
         />
       ) : (
         icon
       )}
-      <span className="max-w-40 truncate">{name}</span>
+    </>
+  );
+  return (
+    <div
+      title={title}
+      className="group flex w-28 shrink-0 flex-col"
+    >
+      <div className="relative flex h-24 w-28 items-center justify-center overflow-hidden rounded-2xl bg-slate-100/80 text-slate-400 ring-1 ring-slate-200/70 dark:bg-slate-800/80 dark:text-slate-500 dark:ring-slate-700/60">
+        {onOpen ? (
+          <button
+            type="button"
+            aria-label={`Open ${name}`}
+            onClick={onOpen}
+            className="flex size-full items-center justify-center focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400/60"
+          >
+            {preview}
+          </button>
+        ) : (
+          preview
+        )}
+        <button
+          type="button"
+          aria-label={`Remove ${name}`}
+          onClick={onRemove}
+          className="absolute top-1 right-1 flex size-8 items-center justify-center rounded-full bg-white/85 text-slate-600 backdrop-blur-sm transition-colors hover:bg-white hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:bg-slate-950/80 dark:text-slate-300 dark:hover:bg-slate-950 dark:hover:text-white"
+        >
+          <XMarkIcon className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="pointer-events-none mt-2 truncate rounded-full bg-slate-900 px-3 py-1.5 text-center text-xs text-white opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 hover:bg-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+        >
+          {name}
+        </button>
+      ) : (
+        <span className="mt-2 truncate rounded-full bg-slate-900 px-3 py-1.5 text-center text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-slate-100 dark:text-slate-900">
+          {name}
+        </span>
+      )}
       {detail && (
         <span
-          className={detailClassName ?? "text-slate-400 dark:text-slate-500"}
+          className={`mt-1 truncate px-1 text-center text-[11px] ${
+            detailClassName ?? "text-slate-400 dark:text-slate-500"
+          }`}
         >
           {detail}
         </span>
       )}
-      <button
-        type="button"
-        aria-label={`Remove ${name}`}
-        onClick={onRemove}
-        className="flex size-4 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-      >
-        <XMarkIcon className="size-3" aria-hidden="true" />
-      </button>
-    </span>
+    </div>
   );
 }
 
@@ -75,10 +111,38 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
   const activeIds = useChatStore((s) => s.activeDocumentIds);
   const removeActiveDocument = useChatStore((s) => s.removeActiveDocument);
   const [docs, setDocs] = useState<Record<string, DocEntry>>({});
+  const [viewerAttachment, setViewerAttachment] = useState<ViewableAttachment | null>(null);
+  const transientViewerUrl = useRef<string | null>(null);
   const docsRef = useRef(docs);
   useEffect(() => {
     docsRef.current = docs;
   }, [docs]);
+
+  useEffect(
+    () => () => {
+      if (transientViewerUrl.current) URL.revokeObjectURL(transientViewerUrl.current);
+    },
+    [],
+  );
+
+  function closeViewer() {
+    setViewerAttachment(null);
+    if (transientViewerUrl.current) {
+      URL.revokeObjectURL(transientViewerUrl.current);
+      transientViewerUrl.current = null;
+    }
+  }
+
+  function openPendingAttachment(attachment: PendingAttachment) {
+    if (!canPreviewAttachment(attachment.file.type)) return;
+    const url = attachment.previewUrl ?? URL.createObjectURL(attachment.file);
+    if (!attachment.previewUrl) transientViewerUrl.current = url;
+    setViewerAttachment({
+      name: attachment.file.name,
+      url,
+      mimeType: attachment.file.type,
+    });
+  }
 
   useEffect(() => {
     if (activeIds.length === 0) return;
@@ -122,16 +186,20 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
   if (activeIds.length === 0 && attachments.length === 0) return null;
 
   return (
-    <div className="mx-auto mb-2 flex w-full max-w-2xl flex-wrap gap-1.5 px-3">
+    <div
+      role="group"
+      aria-label="Message attachments"
+      className="flex w-full min-w-0 flex-nowrap gap-3 overflow-x-auto p-1"
+    >
       {activeIds.map((id) => {
         const entry = docs[id];
         if (entry === "removed") {
           return (
-            <Chip
+            <AttachmentTile
               key={id}
               icon={
                 <ExclamationTriangleIcon
-                  className="size-3.5 shrink-0 text-rose-500 dark:text-rose-400"
+                  className="size-8 shrink-0 text-rose-500 dark:text-rose-400"
                   aria-hidden="true"
                 />
               }
@@ -142,17 +210,17 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
         }
         const status = entry?.status ?? "pending";
         return (
-          <Chip
+          <AttachmentTile
             key={id}
             icon={
               status === "failed" ? (
                 <ExclamationTriangleIcon
-                  className="size-3.5 shrink-0 text-rose-500 dark:text-rose-400"
+                  className="size-8 shrink-0 text-rose-500 dark:text-rose-400"
                   aria-hidden="true"
                 />
               ) : (
                 <DocumentTextIcon
-                  className="size-3.5 shrink-0 text-slate-400 dark:text-slate-500"
+                  className="size-8 shrink-0 text-slate-400 dark:text-slate-500"
                   aria-hidden="true"
                 />
               )
@@ -180,21 +248,25 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
         );
       })}
       {attachments.map((a, i) => (
-        <Chip
+        <AttachmentTile
           key={`${a.file.name}-${i}`}
           image={a.previewUrl}
           icon={
             a.previewUrl ? undefined : (
               <MusicalNoteIcon
-                className="size-3.5 shrink-0 text-slate-400 dark:text-slate-500"
+                className="size-8 shrink-0 text-slate-400 dark:text-slate-500"
                 aria-hidden="true"
               />
             )
           }
           name={a.file.name}
+          onOpen={canPreviewAttachment(a.file.type) ? () => openPendingAttachment(a) : undefined}
           onRemove={() => removeAttachment(i)}
         />
       ))}
+      {viewerAttachment && (
+        <AttachmentViewer attachment={viewerAttachment} onClose={closeViewer} />
+      )}
     </div>
   );
 }

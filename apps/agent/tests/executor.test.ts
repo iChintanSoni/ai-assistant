@@ -92,6 +92,32 @@ test("a happy-path fresh turn starts the task and completes with the final text"
   expect(completeSpy).toHaveBeenCalledWith("the answer");
 });
 
+test("a vision model receives an image-only turn without requiring a text part", async () => {
+  vi.mocked(describeModel).mockResolvedValue(eligibleModel(["text", "image"]));
+  vi.mocked(runAgentToEvents).mockResolvedValue({
+    finalText: "I can see the image.",
+    interrupt: null,
+    usage: null,
+    compaction: null,
+  });
+  const executor = new DeepAgentExecutor();
+  const message: Message = {
+    kind: "message",
+    role: "user",
+    messageId: "image-only",
+    parts: [{ kind: "file", file: { mimeType: "image/png", bytes: "QUJD" } }],
+  };
+
+  await executor.execute(ctx(message), fakeBus());
+
+  expect(failedSpy).not.toHaveBeenCalled();
+  const [runArgs] = vi.mocked(runAgentToEvents).mock.calls[0]!;
+  expect((runArgs as { input: { messages: Array<{ content: unknown }> } }).input.messages[0]!.content).toEqual([
+    { type: "image_url", image_url: "data:image/png;base64,QUJD" },
+  ]);
+  expect(completeSpy).toHaveBeenCalledWith("I can see the image.");
+});
+
 test("falls back to a placeholder when the final text is empty", async () => {
   vi.mocked(describeModel).mockResolvedValue(eligibleModel());
   vi.mocked(runAgentToEvents).mockResolvedValue({ finalText: "", interrupt: null, usage: null, compaction: null });

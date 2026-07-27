@@ -17,6 +17,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { MermaidDiagram } from "./MermaidDiagram";
+import { canPreviewAttachment } from "../lib/attachmentPreview";
+import { AttachmentViewer } from "./AttachmentViewer";
 import { useChatStore } from "../store/chat";
 import type { LegacyUIAttachment, UIAttachment, UICompaction, UIToolCall, UITurn } from "../store/chat";
 import { useChat } from "../hooks/useChat";
@@ -474,7 +476,7 @@ function ApprovalCard({ requests }: { requests: ApprovalRequest[] }) {
 interface RenderableAttachment {
   name: string;
   url?: string;
-  isImage: boolean;
+  mimeType?: string;
 }
 
 /**
@@ -483,34 +485,43 @@ interface RenderableAttachment {
  * attachments have no recoverable URL and render as inert text.
  */
 function normalizeAttachment(a: UIAttachment | LegacyUIAttachment | string): RenderableAttachment {
-  if (typeof a === "string") return { name: a, isImage: false };
-  if ("mimeType" in a) return { name: a.name, url: a.url, isImage: a.mimeType.startsWith("image/") };
-  return { name: a.name, url: a.previewUrl, isImage: Boolean(a.previewUrl) };
+  if (typeof a === "string") return { name: a };
+  if ("mimeType" in a) return { name: a.name, url: a.url, mimeType: a.mimeType };
+  return { name: a.name, url: a.previewUrl, mimeType: a.previewUrl ? "image/*" : undefined };
 }
 
 /** Falls back to a muted "file removed" chip if the underlying file-storage object is gone. */
 function AttachmentImage({ name, url }: { name: string; url: string }) {
   const [errored, setErrored] = useState(false);
+  const [open, setOpen] = useState(false);
   if (errored) return <AttachmentChip name={`${name} (file removed)`} />;
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      aria-label={`Open ${name}`}
-      className="block rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
-    >
-      <img
-        src={url}
-        alt={name}
-        onError={() => setErrored(true)}
-        className="size-14 rounded-xl object-cover ring-1 ring-slate-200/60 transition hover:opacity-90 dark:ring-slate-700/60"
-      />
-    </a>
+    <>
+      <button
+        type="button"
+        aria-label={`Open ${name}`}
+        onClick={() => setOpen(true)}
+        className="block rounded-xl focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+      >
+        <img
+          src={url}
+          alt={name}
+          onError={() => setErrored(true)}
+          className="size-14 rounded-xl object-cover ring-1 ring-slate-200/60 transition hover:opacity-90 dark:ring-slate-700/60"
+        />
+      </button>
+      {open && (
+        <AttachmentViewer
+          attachment={{ name, url, mimeType: "image/*" }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
-function AttachmentChip({ name, href }: { name: string; href?: string }) {
+function AttachmentChip({ name, href, mimeType }: { name: string; href?: string; mimeType?: string }) {
+  const [open, setOpen] = useState(false);
   const className =
     "flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1 pr-2.5 pl-2.5 text-xs text-slate-600 ring-1 ring-slate-200/70 dark:bg-slate-800/80 dark:text-slate-300 dark:ring-slate-700/60";
   const content = (
@@ -520,6 +531,25 @@ function AttachmentChip({ name, href }: { name: string; href?: string }) {
     </>
   );
   if (!href) return <span className={className}>{content}</span>;
+  if (mimeType && canPreviewAttachment(mimeType)) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={`${className} transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:hover:text-slate-200`}
+        >
+          {content}
+        </button>
+        {open && (
+          <AttachmentViewer
+            attachment={{ name, url: href, mimeType }}
+            onClose={() => setOpen(false)}
+          />
+        )}
+      </>
+    );
+  }
   return (
     <a
       href={href}
@@ -591,10 +621,15 @@ function UserTurn({ turn }: { turn: UITurn }) {
         {turn.attachments && turn.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {turn.attachments.map(normalizeAttachment).map((a, i) =>
-              a.isImage && a.url ? (
+              a.mimeType?.startsWith("image/") && a.url ? (
                 <AttachmentImage key={`${a.name}-${i}`} name={a.name} url={a.url} />
               ) : (
-                <AttachmentChip key={`${a.name}-${i}`} name={a.name} href={a.url} />
+                <AttachmentChip
+                  key={`${a.name}-${i}`}
+                  name={a.name}
+                  href={a.url}
+                  mimeType={a.mimeType}
+                />
               ),
             )}
           </div>

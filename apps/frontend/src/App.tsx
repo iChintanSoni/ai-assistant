@@ -7,7 +7,6 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { ClockIcon, Cog6ToothIcon, FolderIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { useChatStore } from "./store/chat";
 import { fetchModels } from "./lib/models";
-import { ChatFiles } from "./components/ChatFiles";
 import { Composer } from "./components/Composer";
 import { Conversation } from "./components/Conversation";
 import { DropOverlay } from "./components/DropOverlay";
@@ -92,7 +91,6 @@ function App() {
             <>
               <Conversation />
               <div className="shrink-0 pt-2 pb-6">
-                <ChatFiles attachments={attachmentsState.attachments} removeAttachment={attachmentsState.removeAttachment} />
                 <Composer {...attachmentsState} />
                 <ErrorNote message={modelsError} />
               </div>
@@ -105,7 +103,6 @@ function App() {
                   let&apos;s get started
                 </span>
               </h1>
-              <ChatFiles attachments={attachmentsState.attachments} removeAttachment={attachmentsState.removeAttachment} />
               <Composer {...attachmentsState} />
               <ErrorNote message={modelsError} />
             </div>

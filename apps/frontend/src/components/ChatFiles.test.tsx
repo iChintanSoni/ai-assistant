@@ -101,8 +101,27 @@ test("renders a preview image for an image attachment and a plain chip otherwise
   // The preview <img> has alt="" (decorative), which removes it from the accessibility
   // tree's "img" role entirely, so it must be queried by its alt text instead.
   expect(screen.getByAltText("")).toHaveAttribute("src", "blob:preview");
-  expect(screen.getByText("photo.png")).toBeInTheDocument();
+  expect(screen.getByText("photo.png")).toHaveClass(
+    "opacity-0",
+    "group-hover:opacity-100",
+    "group-focus-within:opacity-100",
+  );
   expect(screen.getByText("clip.mp3")).toBeInTheDocument();
+});
+
+test("opens and closes an image attachment in the in-app viewer", async () => {
+  const user = userEvent.setup();
+  setup([
+    { file: new File(["x"], "animals.jpg", { type: "image/jpeg" }), previewUrl: "blob:animals" },
+  ]);
+
+  await user.click(screen.getByRole("button", { name: "Open animals.jpg" }));
+
+  expect(screen.getByRole("dialog", { name: "Preview animals.jpg" })).toBeInTheDocument();
+  expect(screen.getByAltText("animals.jpg")).toHaveAttribute("src", "blob:animals");
+
+  await user.click(screen.getByRole("button", { name: "Close attachment preview" }));
+  expect(screen.queryByRole("dialog", { name: "Preview animals.jpg" })).not.toBeInTheDocument();
 });
 
 test("removing a pending attachment calls removeAttachment with its index", async () => {

@@ -31,36 +31,37 @@ beforeEach(() => {
   useChatStore.setState({ isStreaming: false, selectedModel: "m1", models: [model()] });
 });
 
-test("the send button is disabled until there's text or an attachment", async () => {
+test("there is no Send button and the record button is the trailing action", () => {
   setup();
-  expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
-
-  const user = userEvent.setup();
-  await user.type(screen.getByRole("textbox", { name: /ask anything/i }), "hi");
-  expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+  const composer = screen.getByTestId("composer-surface");
+  const record = screen.getByRole("button", { name: "Record voice message" });
+  expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+  expect(composer.lastElementChild).toBe(record);
+  expect(composer).toHaveAttribute("data-expanded", "false");
 });
 
-test("clicking Send calls send() with the typed text and clears the draft", async () => {
+test("pressing Enter calls send() with the typed text and clears the draft", async () => {
   const { send } = setup();
   const user = userEvent.setup();
 
   await user.type(screen.getByRole("textbox", { name: /ask anything/i }), "hello there");
-  await user.click(screen.getByRole("button", { name: "Send" }));
+  await user.keyboard("{Enter}");
 
   await waitFor(() => expect(send).toHaveBeenCalledWith("hello there", []));
   await waitFor(() => expect(screen.getByRole("textbox", { name: /ask anything/i })).toHaveValue(""));
 });
 
-test("pressing Enter submits, but Shift+Enter does not", async () => {
+test("Shift+Enter inserts a newline and plain Enter submits the multiline draft", async () => {
   const { send } = setup();
   const user = userEvent.setup();
   const input = screen.getByRole("textbox", { name: /ask anything/i });
 
   await user.type(input, "line one{Shift>}{Enter}{/Shift}line two");
   expect(send).not.toHaveBeenCalled();
+  expect(input).toHaveValue("line one\nline two");
 
   await user.type(input, "{Enter}");
-  await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(send).toHaveBeenCalledWith("line one\nline two", []));
 });
 
 test("shows a Stop button while streaming, which calls stop()", async () => {
@@ -72,6 +73,7 @@ test("shows a Stop button while streaming, which calls stop()", async () => {
 
   expect(stop).toHaveBeenCalled();
   expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Record voice message" })).not.toBeInTheDocument();
 });
 
 test("a failed send shows an error and keeps the draft text intact", async () => {
@@ -83,7 +85,7 @@ test("a failed send shows an error and keeps the draft text intact", async () =>
   const input = screen.getByRole("textbox", { name: /ask anything/i });
 
   await user.type(input, "keep me");
-  await user.click(screen.getByRole("button", { name: "Send" }));
+  await user.keyboard("{Enter}");
 
   await waitFor(() => expect(screen.getByText("network down")).toBeInTheDocument());
   expect(input).toHaveValue("keep me");
@@ -105,7 +107,33 @@ test("choosing files via the hidden file input calls addFiles", async () => {
   expect(addFiles).toHaveBeenCalledWith([file]);
 });
 
-test("a pending attachment still counts toward enabling Send", () => {
-  setup({ attachments: [{ file: new File(["x"], "notes.pdf", { type: "application/pdf" }) }] });
-  expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+test("pressing Enter sends a pending image without text", async () => {
+  const attachment = { file: new File(["x"], "photo.png", { type: "image/png" }) };
+  const { send } = setup({ attachments: [attachment] });
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole("textbox", { name: /ask anything/i }));
+  await user.keyboard("{Enter}");
+
+  await waitFor(() => expect(send).toHaveBeenCalledWith("", [attachment.file]));
+});
+
+test("attachments expand into a preview tray inside the composer", async () => {
+  const attachment = {
+    file: new File(["x"], "animals.jpg", { type: "image/jpeg" }),
+    previewUrl: "blob:animals",
+  };
+  const { removeAttachment } = setup({ attachments: [attachment] });
+  const user = userEvent.setup();
+  const surface = screen.getByTestId("composer-surface");
+  const tray = screen.getByRole("group", { name: "Message attachments" });
+
+  expect(surface).toHaveAttribute("data-expanded", "true");
+  expect(surface).toContainElement(tray);
+  expect(screen.getByRole("textbox", { name: /ask anything/i })).toHaveAttribute("placeholder", "Ask anything...");
+  expect(screen.getByAltText("")).toHaveAttribute("src", "blob:animals");
+  expect(screen.getByText("animals.jpg")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Remove animals.jpg" }));
+  expect(removeAttachment).toHaveBeenCalledWith(0);
 });
