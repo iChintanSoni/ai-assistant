@@ -15,7 +15,10 @@ running on a local Ollama model via `@langchain/ollama`'s `ChatOllama`.
   `maxInputTokens`) would otherwise silently fall back to a fixed 170k-token
   default unrelated to the model's real window — the code defines a
   `profile` getter on the model instance so that trigger is correct.
-- **Tools**: `getTools()` from `src/agent/tools.ts` — see [tools.md](tools.md).
+- **Tools**: `getAllTools()` from `src/agent/tools.ts` — built-in tools plus
+  every connected MCP server's tools plus any registered peer-agent delegate
+  tools — see [tools.md](tools.md) and
+  [architecture.md](architecture.md#extending-the-agent-three-tiers).
 - **System prompt**: a fixed prompt (in `deepAgent.ts`) covering tone, when to
   use each tool, the `/memories/` convention, and how to cite document search
   results.
@@ -31,8 +34,12 @@ running on a local Ollama model via `@langchain/ollama`'s `ChatOllama`.
   subagent (web search only) reachable via the deep agent's built-in `task`
   tool.
 - **Middleware**: `ollamaToolContentFix` (`middleware.ts`) — see below.
-- **`interruptOn`**: pauses execution before `RISKY_TOOLS` run (`send_email`,
-  `run_javascript`, `generate_image`) until a human approves/rejects.
+- **`interruptOn`**: pauses execution before any risky tool runs — the
+  built-in `RISKY_TOOLS` (`send_email`, `run_javascript`, `generate_image`)
+  plus any MCP server's declared `riskyTools` (e.g. every
+  `apps/mcp-authoring` tool) — until a human approves/rejects. Built inside
+  `buildAgent`'s async setup (`buildInterruptOn`), not at module load, since
+  the MCP-sourced risky-tool list isn't known until servers respond.
 
 ## The `ollamaToolContentFix` middleware
 
@@ -126,8 +133,9 @@ server exposes plain REST routes the frontend uses directly:
 | `GET /documents` | List the document library. |
 | `GET /documents/:id` | One document's status/metadata (frontend polls this during ingest). |
 | `DELETE /documents/:id` | Delete a document, its chunks, and its file-storage objects (original + figures + page images). |
-| `GET /attachments` | Unified attachments/documents/generated-images index for the Files gallery. |
+| `GET /attachments` | Unified attachments/documents/generated-files index for the Files gallery. |
 | `DELETE /attachments/:id` | Delete one attachment. |
+| `POST /transcribe` | `{ url }` (a file-storage audio URL) → `{ text }`. Downloads, transcodes via ffmpeg, transcribes via `whisper-cli` — see `speechToText.ts`. |
 
 ## Background maintenance
 

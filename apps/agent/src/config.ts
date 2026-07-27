@@ -1,4 +1,8 @@
 /** Runtime configuration, read once from the environment (see .env.example). */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT ?? 4000);
 
 export const config = {
@@ -36,6 +40,24 @@ export const config = {
   // entirely and are answered from the full text directly (~4 chars/token estimate).
   smallDocTokenBudget: Number(process.env.SMALL_DOC_TOKEN_BUDGET ?? 6000),
   documentChunkTokenBudget: Number(process.env.DOCUMENT_CHUNK_TOKEN_BUDGET ?? 500),
+  // MCP servers this agent connects to as a client (see agent/mcp.ts). Adding a
+  // capability from the MCP ecosystem, or a first-party MCP server, is a JSON
+  // edit here — not a code change.
+  mcpServersConfigPath: process.env.MCP_SERVERS_CONFIG_PATH ?? path.resolve(__dirname, "../config/mcp-servers.json"),
+  // Peer A2A agents this agent can delegate to (see agent/a2aPeers.ts). Empty by
+  // default — registering one is a JSON edit, not new orchestrator code.
+  a2aPeersConfigPath: process.env.A2A_PEERS_CONFIG_PATH ?? path.resolve(__dirname, "../config/a2a-peers.json"),
+  // Voice input: shells out to a local whisper-cpp CLI (STT decoupled from the
+  // orchestrator model — no Ollama model supports real audio input yet, see
+  // docs/gotchas.md). `brew install whisper-cpp` + download a ggml-*.bin model
+  // (see docs/setup.md); no sane default model path since one must be fetched.
+  whisperCliPath: process.env.WHISPER_CLI_PATH ?? "whisper-cli",
+  whisperModelPath: process.env.WHISPER_MODEL_PATH ?? "",
+  transcribeTimeoutMs: Number(process.env.TRANSCRIBE_TIMEOUT_MS ?? 60000),
+  // Browser MediaRecorder output (audio/webm opus in Chrome, audio/mp4 in Safari) isn't
+  // one of the containers whisper-cli's bundled decoder reads (confirmed live: only
+  // flac/mp3/ogg/wav) — ffmpeg transcodes to 16kHz mono WAV first. `brew install ffmpeg`.
+  ffmpegPath: process.env.FFMPEG_PATH ?? "ffmpeg",
   // Orchestrator numCtx is set to the model's real reported max context length by
   // default (see agent/models.ts). If a model's max is too large for local hardware
   // (Ollama allocates KV-cache for the full numCtx up front), set this to clamp it —

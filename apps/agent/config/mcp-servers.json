@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    },
+    "authoring": {
+      "transport": "stdio",
+      "command": "node",
+      "args": ["--import", "tsx", "apps/mcp-authoring/src/index.ts"],
+      "env": { "FILE_STORAGE_BASE_URL": "http://localhost:6060" },
+      "riskyTools": [
+        "create_docx",
+        "create_pptx",
+        "create_pdf",
+        "create_xlsx",
+        "create_csv",
+        "create_txt",
+        "create_drawio_diagram"
+      ]
+    }
+  }
+}

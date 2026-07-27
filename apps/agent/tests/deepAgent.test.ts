@@ -4,8 +4,10 @@ vi.mock("deepagents", () => ({ createDeepAgent: vi.fn() }));
 vi.mock("@langchain/ollama", () => ({ ChatOllama: vi.fn() }));
 vi.mock("../src/agent/checkpointer.js", () => ({ getCheckpointer: vi.fn() }));
 vi.mock("../src/agent/tools.js", () => ({
-  getTools: vi.fn(() => []),
-  RISKY_TOOLS: ["send_email", "run_javascript", "generate_image"],
+  getAllTools: vi.fn(async () => ({
+    tools: [],
+    riskyToolNames: ["send_email", "run_javascript", "generate_image"],
+  })),
 }));
 vi.mock("../src/agent/backends.js", () => ({ buildBackend: vi.fn() }));
 vi.mock("../src/agent/subagents.js", () => ({ getSubagents: vi.fn(() => []) }));

@@ -7,7 +7,7 @@ import { defineConfig } from "vitest/config";
 // settings apply, so the authoritative include/exclude/thresholds live here.
 export default defineConfig({
   test: {
-    projects: ["apps/agent", "apps/file-storage", "apps/frontend"],
+    projects: ["apps/agent", "apps/file-storage", "apps/frontend", "apps/mcp-authoring"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
@@ -15,6 +15,7 @@ export default defineConfig({
         "apps/agent/src/**/*.ts",
         "apps/file-storage/src/**/*.ts",
         "apps/frontend/src/**/*.{ts,tsx}",
+        "apps/mcp-authoring/src/**/*.ts",
       ],
       exclude: [
         "apps/agent/src/index.ts",
@@ -24,6 +25,7 @@ export default defineConfig({
         "apps/frontend/src/main.tsx",
         "apps/frontend/src/test/**",
         "apps/frontend/src/**/*.test.{ts,tsx}",
+        "apps/mcp-authoring/src/index.ts",
       ],
       thresholds: {
         lines: 80,

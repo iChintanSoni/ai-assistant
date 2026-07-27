@@ -14,6 +14,8 @@ vi.mock("../src/agent/documentStore.js", () => ({
   listDocuments: vi.fn(),
   searchChunks: vi.fn(),
 }));
+vi.mock("../src/agent/mcp.js", () => ({ getMcpBundle: vi.fn(async () => ({ tools: [], riskyToolNames: [] })) }));
+vi.mock("../src/agent/a2aPeers.js", () => ({ getA2APeerTools: vi.fn(() => []) }));
 
 import { execFile } from "node:child_process";
 import { generateImage } from "../src/agent/imageGen.js";
@@ -28,10 +30,13 @@ import {
 } from "../src/agent/documentStore.js";
 import type { DocumentRecord, ChunkRecord } from "../src/agent/documentStore.js";
 import { config } from "../src/config.js";
-import { RISKY_TOOLS, getTools, webSearch } from "../src/agent/tools.js";
+import { RISKY_TOOLS, getAllTools, webSearch } from "../src/agent/tools.js";
+import type { StructuredToolInterface } from "@langchain/core/tools";
+
+let tools: StructuredToolInterface[] = [];
 
 function findTool(name: string) {
-  const t = getTools().find((tool) => tool.name === name);
+  const t = tools.find((tool) => tool.name === name);
   if (!t) throw new Error(`tool ${name} not found`);
   return t;
 }
@@ -61,7 +66,7 @@ function chunk(overrides: Partial<ChunkRecord> = {}): ChunkRecord {
   return { id: "c1", documentId: "doc-1", seq: 0, kind: "text", pageStart: 1, pageEnd: 1, text: "chunk text", imageUrl: null, ...overrides };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(execFile).mockReset();
   vi.mocked(generateImage).mockReset();
   vi.mocked(embedOne).mockReset();
@@ -73,6 +78,7 @@ beforeEach(() => {
   vi.mocked(listDocuments).mockReset();
   vi.mocked(searchChunks).mockReset();
   vi.stubGlobal("fetch", vi.fn());
+  tools = (await getAllTools()).tools;
 });
 
 afterEach(() => {
@@ -80,8 +86,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test("getTools exposes exactly the expected tool set, and RISKY_TOOLS names the HITL-gated ones", () => {
-  const names = getTools().map((t) => t.name).sort();
+test("getAllTools exposes exactly the expected built-in tool set (MCP/A2A peer tools mocked to empty), and RISKY_TOOLS names the built-in HITL-gated ones", () => {
+  const names = tools.map((t) => t.name).sort();
   expect(names).toEqual(
     [
       "get_current_time",

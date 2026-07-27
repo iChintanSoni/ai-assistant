@@ -122,6 +122,59 @@ test("syncFromTurns ignores a generate_image output that isn't valid JSON with a
   expect(listAttachments().filter((r) => r.conversationId === "conv-sync-3")).toHaveLength(0);
 });
 
+test("syncFromTurns indexes a completed authoring document tool call as a generated-document attachment, inferring mimetype from the extension", () => {
+  syncFromTurns("conv-sync-docx", [
+    {
+      role: "agent",
+      tools: [{ name: "create_docx", status: "completed", output: JSON.stringify({ url: "http://files/report.docx", filename: "report.docx" }) }],
+    },
+  ]);
+  const records = listAttachments().filter((r) => r.conversationId === "conv-sync-docx");
+  expect(records).toHaveLength(1);
+  expect(records[0]!.kind).toBe("generated-document");
+  expect(records[0]!.originalName).toBe("report.docx");
+  expect(records[0]!.mimeType).toBe("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+});
+
+test.each([
+  ["create_pptx", "deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+  ["create_pdf", "notes.pdf", "application/pdf"],
+  ["create_xlsx", "sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+  ["create_csv", "data.csv", "text/csv"],
+  ["create_txt", "notes.txt", "text/plain"],
+])("syncFromTurns indexes %s output as a generated-document attachment with the right mimetype", (toolName, filename, mimeType) => {
+  syncFromTurns(`conv-sync-${toolName}`, [
+    { role: "agent", tools: [{ name: toolName, status: "completed", output: JSON.stringify({ url: `http://files/${filename}`, filename }) }] },
+  ]);
+  const records = listAttachments().filter((r) => r.conversationId === `conv-sync-${toolName}`);
+  expect(records).toHaveLength(1);
+  expect(records[0]!.kind).toBe("generated-document");
+  expect(records[0]!.mimeType).toBe(mimeType);
+});
+
+test("syncFromTurns indexes a completed create_drawio_diagram tool call as a generated-diagram attachment", () => {
+  syncFromTurns("conv-sync-drawio", [
+    {
+      role: "agent",
+      tools: [
+        { name: "create_drawio_diagram", status: "completed", output: JSON.stringify({ url: "http://files/flow.drawio", filename: "flow.drawio" }) },
+      ],
+    },
+  ]);
+  const records = listAttachments().filter((r) => r.conversationId === "conv-sync-drawio");
+  expect(records).toHaveLength(1);
+  expect(records[0]!.kind).toBe("generated-diagram");
+  expect(records[0]!.originalName).toBe("flow.drawio");
+  expect(records[0]!.mimeType).toBe("application/xml");
+});
+
+test("syncFromTurns ignores an authoring tool output that isn't valid JSON with a url and filename", () => {
+  syncFromTurns("conv-sync-docx-bad", [
+    { role: "agent", tools: [{ name: "create_docx", status: "completed", output: "not json" }] },
+  ]);
+  expect(listAttachments().filter((r) => r.conversationId === "conv-sync-docx-bad")).toHaveLength(0);
+});
+
 test("syncFromTurns is idempotent when re-run on a growing conversation", () => {
   const turns = [{ role: "user" as const, attachments: [{ name: "x.png", url: "http://files/x.png", mimeType: "image/png", size: 1 }] }];
   syncFromTurns("conv-sync-4", turns);

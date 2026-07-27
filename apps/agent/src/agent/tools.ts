@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { tool } from "@langchain/core/tools";
+import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import { config } from "../config.js";
 import { generateImage } from "./imageGen.js";
@@ -25,6 +25,8 @@ import {
   listDocuments,
   searchChunks,
 } from "./documentStore.js";
+import { getMcpBundle } from "./mcp.js";
+import { getA2APeerTools } from "./a2aPeers.js";
 
 const getCurrentTime = tool(
   async () => new Date().toISOString(),
@@ -373,7 +375,7 @@ const viewDocumentPage = tool(
   },
 );
 
-export function getTools() {
+function getBuiltinTools() {
   return [
     getCurrentTime,
     randomNumber,
@@ -389,3 +391,17 @@ export function getTools() {
 
 /** Tools that must not run without explicit user approval. */
 export const RISKY_TOOLS = ["send_email", "run_javascript", "generate_image"] as const;
+
+/**
+ * Built-ins plus every tool exposed by configured MCP servers (config/mcp-servers.json)
+ * — the "consume an MCP server" tier of the capability architecture (see
+ * docs/architecture.md). Also returns the full set of tool names that must be
+ * HITL-gated: RISKY_TOOLS plus any `riskyTools` an MCP server config declared.
+ */
+export async function getAllTools(): Promise<{ tools: StructuredToolInterface[]; riskyToolNames: string[] }> {
+  const { tools: mcpTools, riskyToolNames: mcpRiskyToolNames } = await getMcpBundle();
+  return {
+    tools: [...getBuiltinTools(), ...mcpTools, ...getA2APeerTools()],
+    riskyToolNames: [...RISKY_TOOLS, ...mcpRiskyToolNames],
+  };
+}

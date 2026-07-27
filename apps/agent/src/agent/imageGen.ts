@@ -18,6 +18,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { uploadToFileStorage } from "@ai-assistant/shared-node";
 import { config } from "../config.js";
 import { getImageGenModel } from "./models.js";
 
@@ -78,20 +79,6 @@ async function runOllamaCli(args: ImageGenArgs, cwd: string): Promise<string> {
   });
 }
 
-async function uploadToFileStorage(filePath: string): Promise<string> {
-  const bytes = await fs.readFile(filePath);
-  const form = new FormData();
-  form.append("file", new Blob([bytes], { type: "image/png" }), path.basename(filePath));
-
-  const res = await fetch(`${config.fileStorageBaseUrl}/upload`, { method: "POST", body: form });
-  if (!res.ok) {
-    throw new Error(`file-storage upload failed: HTTP ${res.status}`);
-  }
-  const data = (await res.json()) as { url?: string };
-  if (!data.url) throw new Error("file-storage upload response missing url");
-  return data.url;
-}
-
 /** Generate an image and return its publicly reachable URL. */
 export async function generateImage(args: ImageGenArgs): Promise<string> {
   const dir = scratchDir();
@@ -105,7 +92,7 @@ export async function generateImage(args: ImageGenArgs): Promise<string> {
 
   const filePath = path.join(dir, filename);
   try {
-    return await uploadToFileStorage(filePath);
+    return await uploadToFileStorage(filePath, config.fileStorageBaseUrl, "image/png");
   } finally {
     await fs.rm(filePath, { force: true });
   }

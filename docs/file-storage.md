@@ -30,6 +30,11 @@ stored and later served back with a real `Content-Type`:
 - Office Open XML (`.docx`/`.pptx`/`.xlsx`) mimetypes are explicitly
   allow-listed (`ALLOWED_OFFICE_MIMES`) alongside PDF/`text/plain`/images/
   audio. See [gotchas.md](gotchas.md) for a real bug this list used to have.
+- A sniffed `video/webm` is accepted (and stored/served as `audio/webm`)
+  specifically when the *client* declared an `audio/*` mimetype — `file-type`
+  can't tell an audio-only WebM (e.g. a browser's `MediaRecorder`, used for
+  voice input) apart from a real video one by magic bytes alone. See
+  [gotchas.md](gotchas.md).
 
 Legacy binary Office (`.doc`/`.xls`/`.ppt`, OLE2/CFB format) has no detector
 in `file-type` at all and is rejected here — the frontend gives users a

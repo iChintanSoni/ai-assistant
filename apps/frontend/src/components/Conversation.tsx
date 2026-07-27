@@ -1,10 +1,11 @@
 /** Scrollable transcript: user pills + agent turns (thinking, tools, answer). */
-import { useEffect, useRef, useState } from "react";
+import { isValidElement, useEffect, useRef, useState } from "react";
 import {
   ArchiveBoxIcon,
   CheckIcon,
   ChevronRightIcon,
   ClipboardDocumentIcon,
+  DocumentArrowDownIcon,
   DocumentTextIcon,
   LightBulbIcon,
   PhotoIcon,
@@ -15,6 +16,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
+import { MermaidDiagram } from "./MermaidDiagram";
 import { useChatStore } from "../store/chat";
 import type { LegacyUIAttachment, UIAttachment, UICompaction, UIToolCall, UITurn } from "../store/chat";
 import { useChat } from "../hooks/useChat";
@@ -73,17 +75,26 @@ const markdownComponents: Components = {
         </code>
       );
     }
+    if (className?.includes("language-mermaid")) {
+      return <MermaidDiagram code={String(children).replace(/\n$/, "")} />;
+    }
     return (
       <code className={className} {...props}>
         {children}
       </code>
     );
   },
-  pre: ({ children }) => (
-    <pre className="overflow-x-auto rounded-2xl bg-slate-50/70 p-3 text-sm text-slate-700 ring-1 ring-slate-200/60 dark:bg-slate-900/60 dark:text-slate-300 dark:ring-slate-700/50">
-      {children}
-    </pre>
-  ),
+  pre: ({ children }) => {
+    // A ```mermaid block's `code` child renders its own container (a diagram, not
+    // text) — skip the code-block chrome (padding/background/monospace) around it.
+    const isMermaid = isValidElement<{ className?: string }>(children) && children.props.className?.includes("language-mermaid");
+    if (isMermaid) return <>{children}</>;
+    return (
+      <pre className="overflow-x-auto rounded-2xl bg-slate-50/70 p-3 text-sm text-slate-700 ring-1 ring-slate-200/60 dark:bg-slate-900/60 dark:text-slate-300 dark:ring-slate-700/50">
+        {children}
+      </pre>
+    );
+  },
   table: ({ children }) => (
     <div className="overflow-x-auto rounded-2xl ring-1 ring-slate-200/60 dark:ring-slate-700/50">
       <table className="w-full text-left text-sm">{children}</table>
@@ -199,6 +210,29 @@ function parseSearchResults(output: unknown): DocSearchHit[] | null {
   }
 }
 
+// apps/mcp-authoring's tools (see docs/architecture.md) all return { url, filename }.
+const FILE_TOOL_NAMES = new Set([
+  "create_docx",
+  "create_pptx",
+  "create_pdf",
+  "create_xlsx",
+  "create_csv",
+  "create_txt",
+  "create_drawio_diagram",
+]);
+
+function parseGeneratedFile(output: unknown): { url: string; filename: string } | null {
+  if (typeof output !== "string") return null;
+  try {
+    const parsed = JSON.parse(output) as { url?: unknown; filename?: unknown };
+    return typeof parsed.url === "string" && typeof parsed.filename === "string"
+      ? { url: parsed.url, filename: parsed.filename }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function extractPrompt(args: unknown): string | undefined {
   const prompt = args && typeof args === "object" ? (args as { prompt?: unknown }).prompt : undefined;
   return typeof prompt === "string" && prompt ? prompt : undefined;
@@ -214,6 +248,23 @@ function GeneratedImage({ url, alt, caption }: { url: string; alt: string; capti
       />
       {caption && <p className="px-1 text-xs text-slate-400 italic dark:text-slate-500">{caption}</p>}
     </>
+  );
+}
+
+function GeneratedFileCard({ url, filename }: { url: string; filename: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 rounded-2xl bg-slate-50/70 p-3 ring-1 ring-slate-200/60 transition hover:ring-blue-300/70 dark:bg-slate-900/60 dark:ring-slate-700/50"
+    >
+      <DocumentArrowDownIcon className="size-8 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-300">{filename}</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">Click to download</p>
+      </div>
+    </a>
   );
 }
 
@@ -561,6 +612,10 @@ function AgentTurn({ turn }: { turn: UITurn }) {
     .filter((t) => t.name === "generate_image" && t.status === "completed")
     .map((t) => ({ id: t.id, image: parseImageResult(t.output), prompt: extractPrompt(t.args) }))
     .filter((x): x is { id: string; image: { url: string }; prompt: string | undefined } => x.image !== null);
+  const generatedFiles = turn.tools
+    .filter((t) => t.status === "completed" && FILE_TOOL_NAMES.has(t.name))
+    .map((t) => ({ id: t.id, file: parseGeneratedFile(t.output) }))
+    .filter((x): x is { id: string; file: { url: string; filename: string } } => x.file !== null);
   return (
     <div className="flex flex-col gap-3">
       {turn.reasoning && (
@@ -597,6 +652,13 @@ function AgentTurn({ turn }: { turn: UITurn }) {
         <div className="flex flex-col gap-2">
           {generatedImages.map(({ id, image, prompt }) => (
             <GeneratedImage key={id} url={image.url} alt={prompt ?? "Generated image"} caption={prompt} />
+          ))}
+        </div>
+      )}
+      {generatedFiles.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {generatedFiles.map(({ id, file }) => (
+            <GeneratedFileCard key={id} url={file.url} filename={file.filename} />
           ))}
         </div>
       )}

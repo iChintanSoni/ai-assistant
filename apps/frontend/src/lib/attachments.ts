@@ -2,7 +2,7 @@
 import { AGENT_URL } from "./config";
 import type { DocumentStatus } from "./documents";
 
-export type AttachmentKind = "document" | "attachment" | "generated-image";
+export type AttachmentKind = "document" | "attachment" | "generated-image" | "generated-document" | "generated-diagram";
 
 export interface AttachmentItem {
   id: string;

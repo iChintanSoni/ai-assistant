@@ -50,13 +50,13 @@ envelopes stream in — `applyEnvelope` is the single reducer for every
 
 | Component | Role |
 | --- | --- |
-| `Conversation.tsx` | Renders turns: reasoning/text blocks, and a `ToolRow` per tool call — with special-cased rendering for `generate_image` (inline `<img>`), `search_documents` (source cards), `summarize_document` (markdown), `view_document_page` (image card), falling back to a raw JSON dump for anything else. |
-| `Composer.tsx` | The message input — paperclip attach (unconditional for document mimetypes; gated by model modality for true image/audio input), send/stop. |
+| `Conversation.tsx` | Renders turns: reasoning/text blocks, and a `ToolRow` per tool call — with special-cased rendering for `generate_image` (inline `<img>`), the `apps/mcp-authoring` tools (download cards, `FILE_TOOL_NAMES`), `search_documents` (source cards), `summarize_document` (markdown), `view_document_page` (image card), falling back to a raw JSON dump for anything else. Markdown rendering also special-cases ` ```mermaid ` code fences via `MermaidDiagram.tsx` (client-side `mermaid.render()`, no tool call involved) instead of a plain code block. |
+| `Composer.tsx` | The message input — paperclip attach (unconditional for document mimetypes; gated by model modality for true image/audio input), a mic button (`hooks/useVoiceInput.ts`: record → upload → `POST /transcribe` → drops the transcript into the text box for editing, never auto-sent), send/stop. |
 | `ModelSelector.tsx` | Live model picker, populated from `GET /models`; only orchestrator-eligible models are offered. |
 | `UsageGauge.tsx` | A small radial gauge next to the composer showing this conversation's cumulative token usage against the selected model's real context length (`ModelInfo.contextLength`), with a popover breakdown including subagent token usage. |
 | `HistoryPanel.tsx` | Rail-triggered flyout: search/delete/date-grouped list of saved conversations (no rename — deliberately out of scope). |
 | `ChatFiles.tsx` | Chip strip above the composer: documents active in the current conversation (polling ingest status) plus files staged to send next. A document becomes "active" by being uploaded/attached during the current conversation — there's no separate action to pull an existing library document into a new one. |
-| `FilesPage.tsx` | Full-page gallery unifying the persistent document library, uploaded attachments, and generated images — grid/list view, search, sort, kind filter, delete. |
+| `FilesPage.tsx` | Full-page gallery unifying the persistent document library, uploaded attachments, and every AI-generated file (images, `apps/mcp-authoring` documents/diagrams) — grid/list view, search, sort, delete. The "Generated" kind filter groups every `generated-*` `AttachmentKind` together (`matchesKindFilter`), so a future generation tool needs no filter-bar change — only `KIND_LABEL`/`KindIcon` need a new case. |
 | `DropOverlay.tsx` | Whole-pane drag-and-drop target, shown via `useFileDrop.ts`. |
 | `SettingsPage.tsx` | Full-page settings: appearance (light/dark) and Ollama model management (search/pull/delete local models, set the default orchestrator/image-gen/embedding model) via the `/ollama/*` routes ([agent.md](agent.md)). |
 
@@ -85,6 +85,7 @@ the store.
 - `history.ts` — `saveConversation`/`getConversation`/list/delete against the agent's `/conversations` routes.
 - `documents.ts` — register/list/delete against `/documents`, plus the `isDocumentFile`/`isLegacyOfficeFile` classifiers `useAttachments.ts` relies on.
 - `attachments.ts` — the unified `/attachments` index consumed by `FilesPage.tsx`; `AttachmentItem.url` is the original file-storage URL, so mimetype-based thumbnailing (`isImage()`) needs zero extra logic even for OCR'd images.
+- `transcribe.ts` — `transcribeAudio(url)` against the agent's `POST /transcribe`, used by `hooks/useVoiceInput.ts`.
 - `models.ts` — `fetchModels()` plus `isAcceptableOtherFile()` (the modality-gating check `useAttachments.ts` uses).
 - `tokens.ts` — `formatTokens()` used by `UsageGauge.tsx`.
 

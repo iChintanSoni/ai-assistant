@@ -6,6 +6,13 @@ const PDF = Buffer.from("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n1 0 obj\n<< /Type /Catalog
 const ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04, ...Array(26).fill(0)]);
 const WAV = Buffer.concat([Buffer.from("RIFF", "ascii"), Buffer.from([0, 0, 0, 0]), Buffer.from("WAVE", "ascii"), Buffer.alloc(8)]);
 const SVG = Buffer.from('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"></svg>');
+// Real header bytes from an ffmpeg-produced audio-only WebM/Opus file (browser
+// MediaRecorder output) — file-type sniffs this as "video/webm" regardless of
+// there being no video track, since the container magic bytes are identical.
+const WEBM_AUDIO = Buffer.from(
+  "GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAG76EU2bdLpNu4tTq4QVSalmUw==",
+  "base64",
+);
 
 test("accepts a real PNG regardless of the client-declared mimetype", async () => {
   await expect(detectAllowedMime(PNG, "application/octet-stream")).resolves.toBe("image/png");
@@ -40,6 +47,16 @@ test("rejects text content when the client didn't claim a text/* mimetype", asyn
 test("rejects a text/* claim when the bytes contain a null byte (binary, not text)", async () => {
   const binary = Buffer.from([0x68, 0x69, 0x00, 0x68, 0x69]);
   await expect(detectAllowedMime(binary, "text/plain")).resolves.toBeNull();
+});
+
+test("accepts a WebM audio recording (sniffed as video/webm) when the client claims an audio/* mimetype, storing it as audio/webm", async () => {
+  await expect(detectAllowedMime(WEBM_AUDIO, "audio/webm")).resolves.toBe("audio/webm");
+  await expect(detectAllowedMime(WEBM_AUDIO, "audio/webm;codecs=opus")).resolves.toBe("audio/webm");
+});
+
+test("rejects a WebM file when the client doesn't claim an audio/* mimetype (could be real video)", async () => {
+  await expect(detectAllowedMime(WEBM_AUDIO, "video/webm")).resolves.toBeNull();
+  await expect(detectAllowedMime(WEBM_AUDIO, "application/octet-stream")).resolves.toBeNull();
 });
 
 test("rejects a text/* claim when the bytes aren't valid UTF-8", async () => {

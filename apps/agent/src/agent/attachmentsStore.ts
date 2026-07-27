@@ -13,7 +13,7 @@ import Database from "better-sqlite3";
 import { config } from "../config.js";
 import { listDocuments } from "./documentStore.js";
 
-export type AttachmentKind = "document" | "attachment" | "generated-image";
+export type AttachmentKind = "document" | "attachment" | "generated-image" | "generated-document" | "generated-diagram";
 
 export interface AttachmentRecord {
   id: string;
@@ -177,6 +177,39 @@ function parseGeneratedImage(output: unknown): { url: string; prompt: string } |
   }
 }
 
+// The apps/mcp-authoring MCP server's tools (see docs/architecture.md's "first-party
+// MCP server" tier) all return `JSON.stringify({ url, filename })` on success.
+const DOCUMENT_TOOL_NAMES = new Set(["create_docx", "create_pptx", "create_pdf", "create_xlsx", "create_csv", "create_txt"]);
+const DIAGRAM_TOOL_NAMES = new Set(["create_drawio_diagram"]);
+
+const EXTENSION_MIME_TYPES: Record<string, string> = {
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pdf: "application/pdf",
+  csv: "text/csv",
+  txt: "text/plain",
+  drawio: "application/xml",
+};
+
+function mimeTypeFromFilename(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return EXTENSION_MIME_TYPES[ext] ?? "application/octet-stream";
+}
+
+/** Parses an authoring tool's `JSON.stringify({ url, filename })` output. */
+function parseGeneratedFile(output: unknown): { url: string; filename: string } | null {
+  const raw = typeof output === "string" ? output : null;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { url?: unknown; filename?: unknown };
+    if (typeof parsed.url !== "string" || typeof parsed.filename !== "string") return null;
+    return { url: parsed.url, filename: parsed.filename };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Called after a conversation is saved (see PUT /conversations/:id): indexes
  * every attachment upload and generated image found in its turns. Idempotent
@@ -202,19 +235,40 @@ export function syncFromTurns(conversationId: string, turns: SyncableTurn[]): vo
       }
     } else {
       for (const tool of turn.tools ?? []) {
-        if (tool.name !== "generate_image" || tool.status !== "completed") continue;
-        const generated = parseGeneratedImage(tool.output);
-        if (!generated) continue;
-        upsertAttachment({
-          fileStorageFilename: filenameFromUrl(generated.url),
-          url: generated.url,
-          originalName: `${generated.prompt.slice(0, 60)}.png`,
-          mimeType: "image/png",
-          size: 0,
-          kind: "generated-image",
-          conversationId,
-          createdAt: now,
-        });
+        if (tool.status !== "completed") continue;
+
+        if (tool.name === "generate_image") {
+          const generated = parseGeneratedImage(tool.output);
+          if (!generated) continue;
+          upsertAttachment({
+            fileStorageFilename: filenameFromUrl(generated.url),
+            url: generated.url,
+            originalName: `${generated.prompt.slice(0, 60)}.png`,
+            mimeType: "image/png",
+            size: 0,
+            kind: "generated-image",
+            conversationId,
+            createdAt: now,
+          });
+          continue;
+        }
+
+        const isDocument = DOCUMENT_TOOL_NAMES.has(tool.name ?? "");
+        const isDiagram = DIAGRAM_TOOL_NAMES.has(tool.name ?? "");
+        if (isDocument || isDiagram) {
+          const generated = parseGeneratedFile(tool.output);
+          if (!generated) continue;
+          upsertAttachment({
+            fileStorageFilename: filenameFromUrl(generated.url),
+            url: generated.url,
+            originalName: generated.filename,
+            mimeType: mimeTypeFromFilename(generated.filename),
+            size: 0,
+            kind: isDocument ? "generated-document" : "generated-diagram",
+            conversationId,
+            createdAt: now,
+          });
+        }
       }
     }
   }

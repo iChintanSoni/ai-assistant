@@ -28,6 +28,7 @@ import {
 } from "../agent/historyStore.js";
 import { deleteConversationFiles } from "../agent/fileCleanup.js";
 import { ingestDocument } from "../agent/documentIngest.js";
+import { transcribeAudio } from "../agent/speechToText.js";
 import { deleteDocumentRecord, getChunksForDocument, getDocumentRecord, getDocumentsByIds, listDocuments } from "../agent/documentStore.js";
 import {
   deleteAttachment,
@@ -223,6 +224,24 @@ export function buildApp(): express.Express {
 
   app.get("/documents", (_req, res) => {
     res.json({ documents: listDocuments() });
+  });
+
+  // Voice input — the frontend uploads recorded audio to file-storage first (same
+  // pattern as documents/attachments), then this transcribes it via a local
+  // whisper-cpp CLI (see speechToText.ts) and returns the plain text for the
+  // user to review/edit in the composer before sending — never auto-sent.
+  app.post("/transcribe", async (req, res) => {
+    const { url } = req.body as { url?: unknown };
+    if (typeof url !== "string") {
+      res.status(400).json({ error: "Expected { url: string }" });
+      return;
+    }
+    try {
+      const text = await transcribeAudio(url);
+      res.json({ text });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   app.get("/documents/:id", (req, res) => {

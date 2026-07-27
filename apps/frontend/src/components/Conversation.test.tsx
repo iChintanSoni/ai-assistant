@@ -243,6 +243,39 @@ test("renders a generate_image tool's result inline with the reply text, and its
   expect(screen.getByText(/"url": "http:\/\/files\/fox.png"/)).toBeInTheDocument();
 });
 
+test("renders an authoring tool's result as a download card inline with the reply text, and its tool row stays compact with raw input/output", async () => {
+  useChatStore.setState({
+    turns: [
+      agentTurn({
+        text: "Here's the report.",
+        tools: [
+          {
+            id: "t1",
+            name: "create_docx",
+            args: { title: "Q3 Report" },
+            output: JSON.stringify({ url: "http://files/q3-report.docx", filename: "q3-report.docx" }),
+            status: "completed",
+          },
+        ],
+      }),
+    ],
+  });
+  render(<Conversation />);
+
+  // Download card renders as part of the reply, not inside the (collapsed by default) tool row.
+  const link = screen.getByRole("link", { name: /q3-report\.docx/i });
+  expect(link).toHaveAttribute("href", "http://files/q3-report.docx");
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(screen.getByText(/here's the report/i)).toBeInTheDocument();
+
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /create_docx/i }));
+  expect(screen.getByText("Input")).toBeInTheDocument();
+  expect(screen.getByText(/"title": "Q3 Report"/)).toBeInTheDocument();
+  expect(screen.getByText("Output")).toBeInTheDocument();
+  expect(screen.getByText(/"filename": "q3-report.docx"/)).toBeInTheDocument();
+});
+
 test("renders search_documents results as source cards, plus raw input/output", () => {
   const hits = [{ documentId: "d1", documentName: "report.pdf", page: "3", text: "relevant excerpt" }];
   useChatStore.setState({

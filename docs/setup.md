@@ -26,6 +26,28 @@ Full local development setup for all three services.
   fail — see `DOCLING_CLI_PATH` below.
 - **Optional — web search**: a [Tavily](https://tavily.com) API key. Without
   one, `web_search` falls back to keyless DuckDuckGo scraping automatically.
+- **Optional — reading URLs directly**: [`uv`](https://docs.astral.sh/uv/)
+  (provides `uvx`), used to run the `fetch` MCP server
+  (`uvx mcp-server-fetch`) with no separate install step. Without it, that
+  one MCP server just fails to connect at startup — the rest of the agent
+  (including every other MCP server/tool) is unaffected. See
+  [architecture.md](architecture.md#extending-the-agent-three-tiers).
+- **Optional — voice input**: [whisper-cpp](https://github.com/ggml-org/whisper.cpp)
+  and [ffmpeg](https://ffmpeg.org) (both bottled on Homebrew, fast installs):
+  ```
+  brew install whisper-cpp ffmpeg
+  ```
+  plus a GGML model file — any size works, `tiny.en` is fastest for testing:
+  ```
+  curl -L -o apps/agent/data/whisper-models/ggml-tiny.en.bin \
+    https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin
+  ```
+  then set `WHISPER_MODEL_PATH` to that file's path (see the env var table
+  below). Without it, the mic button still renders but transcription returns
+  a clear "isn't set up yet" error rather than failing silently. `ffmpeg` is
+  required regardless of model — it transcodes whatever format the browser
+  recorded into something whisper-cli can actually decode (see
+  [gotchas.md](gotchas.md)).
 
 ## Install
 
@@ -33,8 +55,11 @@ Full local development setup for all three services.
 npm install
 ```
 
-This installs all three workspaces (`apps/agent`, `apps/frontend`,
-`apps/file-storage`) from the root.
+This installs every workspace (`apps/agent`, `apps/frontend`,
+`apps/file-storage`, `apps/mcp-authoring`, `packages/shared-node`) from the
+root — `apps/mcp-authoring` isn't run directly (see
+[architecture.md](architecture.md)), so it needs no `.env`/`dev` step of its
+own.
 
 ## Environment variables
 
@@ -70,6 +95,12 @@ cp apps/frontend/.env.example apps/frontend/.env
 | `DOCUMENT_CHUNK_TOKEN_BUDGET` | `500` | Target chunk size for larger documents. |
 | `DENO_PATH` | `deno` | Path to the Deno binary used by the `run_javascript` sandbox. |
 | `SANDBOX_TIMEOUT_MS` | `10000` | Timeout for a single `run_javascript` execution. |
+| `MCP_SERVERS_CONFIG_PATH` | `config/mcp-servers.json` | MCP servers the agent connects to as a client — see [architecture.md](architecture.md#extending-the-agent-three-tiers). |
+| `A2A_PEERS_CONFIG_PATH` | `config/a2a-peers.json` | Peer A2A agents the agent can delegate to. Empty (`[]`) by default. |
+| `WHISPER_CLI_PATH` | `whisper-cli` | Path to the whisper-cpp CLI binary, used for voice input. |
+| `WHISPER_MODEL_PATH` | unset | Path to a `ggml-*.bin` model file. Voice input returns a setup-guidance error until this is set. |
+| `TRANSCRIBE_TIMEOUT_MS` | `60000` | Timeout for a single transcription (ffmpeg transcode + whisper-cli). |
+| `FFMPEG_PATH` | `ffmpeg` | Path to the ffmpeg binary, used to transcode recorded audio before transcription. |
 | `MAX_CONTEXT_TOKENS` | unset | Clamps the orchestrator's context window below the model's real max if your hardware needs it. |
 
 ### `apps/file-storage/.env`
@@ -112,6 +143,6 @@ Then open `http://localhost:5173`.
 ## Type checking and tests
 
 ```
-npm run typecheck          # all three workspaces
-npm run test                # unit tests across all three workspaces (vitest)
+npm run typecheck          # every workspace
+npm run test                # unit tests across every workspace (vitest)
 ```

@@ -90,6 +90,25 @@ test("the kind filter narrows the list to documents only", async () => {
   expect(screen.queryByText("upload.png")).not.toBeInTheDocument();
 });
 
+test("the Generated filter groups every generated-* kind (image, document, diagram) together", async () => {
+  vi.mocked(listAttachments).mockResolvedValue([
+    item({ id: "a1", originalName: "pic.png", kind: "generated-image" }),
+    item({ id: "a2", originalName: "report.docx", kind: "generated-document", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
+    item({ id: "a3", originalName: "flow.drawio", kind: "generated-diagram", mimeType: "application/xml" }),
+    item({ id: "a4", originalName: "upload.png", kind: "attachment" }),
+  ]);
+  const user = userEvent.setup();
+  renderPage();
+  await waitFor(() => expect(screen.getByText("pic.png")).toBeInTheDocument());
+
+  await user.click(screen.getByRole("radio", { name: "Generated" }));
+
+  expect(screen.getByText("pic.png")).toBeInTheDocument();
+  expect(screen.getByText("report.docx")).toBeInTheDocument();
+  expect(screen.getByText("flow.drawio")).toBeInTheDocument();
+  expect(screen.queryByText("upload.png")).not.toBeInTheDocument();
+});
+
 test("switching to list view shows the table header row", async () => {
   vi.mocked(listAttachments).mockResolvedValue([item()]);
   const user = userEvent.setup();

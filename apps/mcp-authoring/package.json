@@ -1,0 +1,32 @@
+{
+  "name": "mcp-authoring",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch --import tsx src/index.ts",
+    "start": "node --env-file-if-exists=.env --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ai-assistant/shared-node": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "docx": "^9",
+    "exceljs": "^4",
+    "pdfkit": "^0.15",
+    "pptxgenjs": "^3",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/pdfkit": "^0.13",
+    "tsx": "^4",
+    "typescript": "^6",
+    "vitest": "^4.1.10"
+  }
+}

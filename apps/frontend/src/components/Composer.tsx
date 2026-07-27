@@ -1,10 +1,11 @@
 /** The prompt pill: modality-gated attach, input, model selector, send/stop. */
 import { useRef, useState } from "react";
-import { ArrowUpIcon, PaperClipIcon, StopIcon } from "@heroicons/react/24/outline";
+import { ArrowUpIcon, MicrophoneIcon, PaperClipIcon, StopIcon } from "@heroicons/react/24/outline";
 import { ModelSelector } from "./ModelSelector";
 import { UsageGauge } from "./UsageGauge";
 import { useChat } from "../hooks/useChat";
 import { useChatStore } from "../store/chat";
+import { useVoiceInput } from "../hooks/useVoiceInput";
 import type { PendingAttachment } from "../hooks/useAttachments";
 import { acceptFor } from "../lib/models";
 import { DOCUMENT_ACCEPT } from "../lib/documents";
@@ -28,6 +29,9 @@ export function Composer({ attachments, notice, addFiles, clear }: ComposerProps
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const voice = useVoiceInput((transcript) =>
+    setText((prev) => (prev.trim() ? `${prev.trim()} ${transcript}` : transcript)),
+  );
 
   async function submit() {
     if (isStreaming || isSending) return;
@@ -72,6 +76,22 @@ export function Composer({ attachments, notice, addFiles, clear }: ComposerProps
           className="hidden"
         />
 
+        <button
+          type="button"
+          aria-label={
+            voice.state === "recording" ? "Stop recording" : voice.state === "transcribing" ? "Transcribing…" : "Record voice message"
+          }
+          onClick={voice.toggle}
+          disabled={voice.state === "transcribing"}
+          className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 ${
+            voice.state === "recording"
+              ? "bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
+              : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          }`}
+        >
+          <MicrophoneIcon className={`size-5 ${voice.state !== "idle" ? "animate-pulse" : ""}`} />
+        </button>
+
         <input
           type="text"
           value={text}
@@ -112,9 +132,9 @@ export function Composer({ attachments, notice, addFiles, clear }: ComposerProps
         )}
       </div>
 
-      {(sendError || notice) && (
+      {(sendError || voice.error || notice) && (
         <p className="mx-auto mt-3 max-w-2xl px-3 text-center text-sm text-rose-500 dark:text-rose-400">
-          {sendError || notice}
+          {sendError || voice.error || notice}
         </p>
       )}
     </div>

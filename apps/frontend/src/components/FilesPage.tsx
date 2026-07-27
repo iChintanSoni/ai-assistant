@@ -17,7 +17,11 @@ import { formatBytes } from "../lib/format";
 import { getConversation } from "../lib/history";
 import { useChatStore } from "../store/chat";
 
-type KindFilter = "all" | AttachmentKind;
+// A coarser grouping than AttachmentKind: every "generated-*" kind (image, document,
+// diagram, ...) shares one "Generated" filter chip, so a future generation tool needs
+// no filter-bar change to show up correctly here — only KIND_LABEL/KindIcon below
+// need a new case for its own icon/label.
+type KindFilter = "all" | "document" | "attachment" | "generated";
 type SortKey = "date" | "name" | "size";
 type ViewMode = "grid" | "list";
 
@@ -25,14 +29,22 @@ const KIND_FILTERS: { value: KindFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "document", label: "Documents" },
   { value: "attachment", label: "Uploads" },
-  { value: "generated-image", label: "Generated" },
+  { value: "generated", label: "Generated" },
 ];
 
 const KIND_LABEL: Record<AttachmentKind, string> = {
   document: "Document",
   attachment: "Uploaded",
-  "generated-image": "Generated",
+  "generated-image": "Image",
+  "generated-document": "Document",
+  "generated-diagram": "Diagram",
 };
+
+function matchesKindFilter(item: AttachmentItem, filter: KindFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "generated") return item.kind.startsWith("generated-");
+  return item.kind === filter;
+}
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -90,7 +102,7 @@ export function FilesPage({ navigateToChat }: FilesPageProps) {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const byKindAndQuery = items.filter((item) => {
-      if (kindFilter !== "all" && item.kind !== kindFilter) return false;
+      if (!matchesKindFilter(item, kindFilter)) return false;
       if (needle && !item.originalName.toLowerCase().includes(needle)) return false;
       return true;
     });
@@ -203,6 +215,8 @@ function KindIcon({ item, className }: { item: AttachmentItem; className: string
       <DocumentTextIcon className={className} aria-hidden="true" />
     );
   }
+  if (item.kind === "generated-document") return <DocumentTextIcon className={className} aria-hidden="true" />;
+  if (item.kind === "generated-diagram") return <Squares2X2Icon className={className} aria-hidden="true" />;
   if (item.mimeType.startsWith("audio/")) return <MusicalNoteIcon className={className} aria-hidden="true" />;
   return <DocumentIcon className={className} aria-hidden="true" />;
 }
@@ -288,7 +302,7 @@ function FileTile({
           <KindIcon item={item} className="size-9 text-slate-400 dark:text-slate-500" />
         )}
       </button>
-      {item.kind === "generated-image" && (
+      {item.kind.startsWith("generated-") && (
         <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-medium text-slate-600 backdrop-blur dark:bg-slate-900/80 dark:text-slate-300">
           <SparklesIcon className="size-3" aria-hidden="true" />
           Generated

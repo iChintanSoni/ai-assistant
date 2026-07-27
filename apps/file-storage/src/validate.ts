@@ -14,9 +14,14 @@ const ALLOWED_OFFICE_MIMES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
 ]);
 
-function isAllowedMime(mime: string): boolean {
+function isAllowedMime(mime: string, clientMime: string): boolean {
   if (mime.startsWith("image/")) return mime !== "image/svg+xml"; // SVG can carry <script>
   if (mime.startsWith("audio/")) return true;
+  // WebM audio-only recordings (e.g. a browser's MediaRecorder, used for voice input)
+  // share identical container magic bytes with WebM video — file-type can't tell them
+  // apart without deep track parsing. Trust the client's audio/* claim only to
+  // disambiguate an already-verified-WebM container, not to bypass sniffing entirely.
+  if (mime === "video/webm" && clientMime.startsWith("audio/")) return true;
   return mime === "application/pdf" || mime === "text/plain" || ALLOWED_OFFICE_MIMES.has(mime);
 }
 
@@ -35,5 +40,8 @@ function looksLikeText(buffer: Buffer): boolean {
 export async function detectAllowedMime(buffer: Buffer, clientMime: string): Promise<string | null> {
   const sniffed = await fileTypeFromBuffer(buffer);
   const mime = sniffed?.mime ?? (clientMime.startsWith("text/") && looksLikeText(buffer) ? "text/plain" : null);
-  return mime && isAllowedMime(mime) ? mime : null;
+  if (!mime || !isAllowedMime(mime, clientMime)) return null;
+  // Store "audio/webm", not the sniffed-but-ambiguous "video/webm", once the client's
+  // claim has disambiguated it — see isAllowedMime's webm branch.
+  return mime === "video/webm" ? "audio/webm" : mime;
 }

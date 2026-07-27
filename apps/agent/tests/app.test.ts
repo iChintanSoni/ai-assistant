@@ -39,6 +39,7 @@ vi.mock("../src/agent/attachmentsStore.js", () => ({
   syncFromTurns: vi.fn(),
   upsertAttachment: vi.fn(),
 }));
+vi.mock("../src/agent/speechToText.js", () => ({ transcribeAudio: vi.fn() }));
 
 import {
   deleteModel,
@@ -60,6 +61,7 @@ import {
 } from "../src/agent/historyStore.js";
 import { deleteConversationFiles } from "../src/agent/fileCleanup.js";
 import { ingestDocument } from "../src/agent/documentIngest.js";
+import { transcribeAudio } from "../src/agent/speechToText.js";
 import { deleteDocumentRecord, getChunksForDocument, getDocumentRecord, listDocuments } from "../src/agent/documentStore.js";
 import {
   deleteAttachment,
@@ -105,6 +107,7 @@ beforeEach(() => {
   vi.mocked(deleteAttachmentForDocument).mockReset();
   vi.mocked(syncFromTurns).mockReset();
   vi.mocked(upsertAttachment).mockReset();
+  vi.mocked(transcribeAudio).mockReset();
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
 });
 
@@ -332,6 +335,27 @@ test("POST /documents ingests the upload and indexes it as an attachment", async
   expect(res.status).toBe(201);
   expect(res.body).toEqual(record);
   expect(upsertAttachment).toHaveBeenCalledWith(expect.objectContaining({ documentId: "doc-1", kind: "document" }));
+});
+
+test("POST /transcribe rejects a malformed body", async () => {
+  const res = await request(app).post("/transcribe").send({});
+  expect(res.status).toBe(400);
+  expect(transcribeAudio).not.toHaveBeenCalled();
+});
+
+test("POST /transcribe returns the transcript on success", async () => {
+  vi.mocked(transcribeAudio).mockResolvedValue("hello world");
+  const res = await request(app).post("/transcribe").send({ url: "http://files/clip.webm" });
+  expect(res.status).toBe(200);
+  expect(res.body).toEqual({ text: "hello world" });
+  expect(transcribeAudio).toHaveBeenCalledWith("http://files/clip.webm");
+});
+
+test("POST /transcribe returns 500 with the error message when transcription fails", async () => {
+  vi.mocked(transcribeAudio).mockRejectedValue(new Error("WHISPER_MODEL_PATH is not set"));
+  const res = await request(app).post("/transcribe").send({ url: "http://files/clip.webm" });
+  expect(res.status).toBe(500);
+  expect(res.body).toEqual({ error: "WHISPER_MODEL_PATH is not set" });
 });
 
 test("GET /documents/:id returns 404 for an unknown document", async () => {
