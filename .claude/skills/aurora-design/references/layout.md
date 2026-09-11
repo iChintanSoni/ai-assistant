@@ -1,23 +1,31 @@
 # Layout & Shells
 
-How to structure a screen: a single non-scrolling viewport, a thin fixed rail on
-the left, and one centered focal area on top of the glow.
+How to structure a screen: a single non-scrolling viewport, navigation pinned to
+one edge, and one centered focal area on top of the glow.
+
+Written desktop-side below. The layout is **designed at phone width first** — see
+[responsive.md](responsive.md) for the base case, the breakpoint ladder, and the
+bottom-bar lane that the rail replaces at `md:`.
 
 ## Root shell
 
 ```tsx
-<div className="relative flex h-screen w-screen overflow-hidden bg-white font-sans text-slate-800 antialiased">
+<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-slate-800 antialiased md:flex-row">
   <AuroraGlow />   {/* paints first, behind everything */}
-  <Sidebar />      {/* z-20 */}
-  <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6">
+  <BottomBar />    {/* z-20, md:hidden */}
+  <Sidebar />      {/* z-20, hidden md:flex */}
+  <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 md:px-6">
     {/* focal content */}
   </main>
 </div>
 ```
 
 - `relative` — positioning context for the absolute glow.
-- `flex` — rail + main sit side by side.
-- `h-screen w-screen overflow-hidden` — exactly one screen, never scrolls. (Needs
+- `flex flex-col md:flex-row` — nav sits below the content on a phone, beside it on
+  desktop.
+- `h-dvh w-full overflow-hidden` — exactly one screen, never scrolls. `dvh` rather
+  than `vh` because mobile browser toolbars change the viewport height, and `vh`
+  measures the largest one — putting the composer below the fold. (Needs
   `html, body, #root { height: 100% }` from [setup.md](setup.md).)
 - `bg-white font-sans text-slate-800 antialiased` — base surface + type.
 
@@ -53,7 +61,9 @@ bottom via `justify-between`.
 ```
 
 Rules:
-- Width is `w-16`, no background/border — it floats over the page and glow.
+- Width is `w-16`, no background/border — it floats over the page and glow. It is
+  `hidden md:flex`; below that the bottom bar takes over
+  ([responsive.md](responsive.md)).
 - `justify-between` splits nav group (top) and avatar (bottom).
 - The rail is `z-20` so it always sits above the glow.
 - Every item is icon-only → every item needs an `aria-label` (see
@@ -62,20 +72,27 @@ Rules:
 
 ## Responsive behavior
 
-This is desktop-first but must not break on mobile.
+**Mobile-first.** Write the phone layout, then add `sm:`/`md:`/`lg:` upward. Full
+recipes live in [responsive.md](responsive.md); the essentials:
 
-- The rail stays `w-16` at all sizes (it is already minimal). Do **not** convert it
-  to a bottom bar unless a task explicitly asks.
+- Navigation is a **bottom bar** on phones and the `w-16` left rail from `md:` up.
+  (This reverses an earlier rule that kept the rail at every size — 64px of a 375px
+  viewport is too much chrome, and the bottom edge is where thumbs are.)
 - Focal content scales with `sm:` breakpoints (e.g. `text-4xl sm:text-5xl`).
 - Non-essential inline labels collapse on small screens — e.g. the model selector
   hides its text with `hidden sm:inline`, leaving icon + chevron. Prefer hiding
   secondary text over letting the pill overflow.
+- Grids start at one column and widen: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`.
 - Keep `max-w-2xl` on the hub so it never spans an ultra-wide screen.
-- Always verify at 1440×900 **and** 390×844 (see [glow.md](glow.md) → verifying).
+- Always verify at 375×812 **and** 1440×900, light and dark (see
+  [glow.md](glow.md) → verifying).
 
 ## Anti-patterns
 
-❌ A scrolling page (breaks the single-screen, non-scroll intent).
+❌ A scrolling *shell* (breaks the single-screen intent). A focal pane that
+scrolls inside the shell is fine, and on a phone it is usually required.
+❌ `h-screen` on the root — use `h-dvh` ([responsive.md](responsive.md)).
+❌ A left rail that survives below `md:`.
 ❌ Boxing `main` content in a bordered/shadowed card.
 ❌ Multiple focal blocks competing for attention.
 ❌ A heavy/opaque sidebar with its own panel background.

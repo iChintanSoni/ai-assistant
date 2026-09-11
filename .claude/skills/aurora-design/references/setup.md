@@ -43,7 +43,7 @@ export default defineConfig({
 html,
 body,
 #root {
-  height: 100%;   /* required so h-screen / h-full fill the viewport */
+  height: 100%;   /* required so h-dvh / h-full fill the viewport */
   margin: 0;
 }
 ```

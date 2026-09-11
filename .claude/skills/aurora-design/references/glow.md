@@ -106,5 +106,5 @@ cd apps/frontend && npm run dev
 ```
 
 Then use the chrome-devtools MCP tools (`new_page`, `resize_page`,
-`take_screenshot`) at both desktop (1440×900) and mobile (390×844). The brightest
+`take_screenshot`) at both desktop (1440×900) and mobile (375×812). The brightest
 part of the glow should sit directly behind the focal element on both.

@@ -492,9 +492,21 @@ traverses conversations; a failed conversation load still redirects to `/`;
 focus moves to the new view on navigate; the old hook and its ad-hoc callbacks
 are gone; tests ported.
 
-## F2 — Mobile-first in the design system
+## F2 — Mobile-first in the design system *(skill done; screens in progress)*
 
-**Now:** the `aurora-design` skill documents a desktop-only shell —
+The **design-system half has landed**: `references/responsive.md` is written, and
+`layout.md`'s stance, `tokens.md`'s breakpoint ladder and 44px tap-target floor,
+`accessibility.md`, `components.md`, `glow.md`, `examples/HomePage.tsx` and
+`SKILL.md` all now read mobile-first. Navigation is a bottom bar below `md:` and
+the `w-16` rail above it. What remains is retrofitting the four screens, in the
+order listed below.
+
+Baseline measured on `main` at 375×812 before the rules were written: the composer
+textarea was 37px wide (placeholder wrapping one character per line), the rail took
+64px of 375px, the History flyout ran 25px off-screen, the Files grid rendered two
+115px columns, and 9/34/25 controls sat under 44px on hub/Files/Settings.
+
+**Was:** the `aurora-design` skill documents a desktop-only shell —
 `h-screen w-screen overflow-hidden` with a fixed `w-16` rail
 (`references/layout.md`) — and `App.tsx` implements exactly that. `index.html`
 already has the right viewport meta, so nothing is actively broken, but nothing

@@ -88,8 +88,12 @@ motion alone.
 
 ## Tap targets
 
-Primary interactive targets are `size-10` (40px) — the practical minimum for
-touch. Don't shrink icon buttons below that. The avatar at `size-9` (36px) is a
+Primary interactive targets are `size-11` (44px) on touch — the practical minimum,
+and the figure both Apple's HIG and Material use. (WCAG 2.2's 24px AA minimum is a
+floor to clear, not a target to aim at.) From `md:` up, where there's a pointer,
+`size-10` (40px) is fine. Don't shrink icon buttons below that. A control that must
+look smaller can still meet the floor by padding its hit area rather than its
+visual box. The avatar at `size-9` (36px) is a
 borderline exception; enlarge if it becomes a primary action.
 
 ## Quick audit checklist
@@ -100,6 +104,6 @@ borderline exception; enlarge if it becomes a primary action.
 - [ ] Text contrast ≥ AA (placeholders excepted, and only for hints).
 - [ ] Reduced-motion guard present.
 - [ ] Native elements + sensible tab order; custom menus fully keyboard-operable.
-- [ ] Tap targets ≥ 40px for primary actions.
+- [ ] Tap targets ≥ 44px on touch (≥ 40px from `md:` up) for primary actions.
 
 For deeper audits, use the `chrome-devtools-mcp:a11y-debugging` skill.
