@@ -1,5 +1,9 @@
-/** Whole-pane drag-and-drop: tracks drag-over state and hands dropped files to a callback. */
-import { useEffect, useRef, useState } from "react";
+/**
+ * Whole-pane drag-and-drop: tracks drag-over state and hands dropped files to a
+ * callback. The window-level guard against strays lives in useBlockStrayFileDrops,
+ * mounted by the layout — it has to outlive any one route, this doesn't.
+ */
+import { useRef, useState } from "react";
 import type { DragEvent } from "react";
 
 function hasFiles(e: DragEvent): boolean {
@@ -12,20 +16,6 @@ export function useFileDrop(onDropFiles: (files: File[]) => void) {
   // not just the wrapper — a depth counter (not a boolean) is what keeps the
   // overlay from flickering as the drag moves over nested elements.
   const depthRef = useRef(0);
-
-  useEffect(() => {
-    // Safety net: a file dropped outside the drop zone (e.g. the sidebar
-    // rail) would otherwise make the browser navigate away from the app.
-    function preventDefault(e: globalThis.DragEvent) {
-      e.preventDefault();
-    }
-    window.addEventListener("dragover", preventDefault);
-    window.addEventListener("drop", preventDefault);
-    return () => {
-      window.removeEventListener("dragover", preventDefault);
-      window.removeEventListener("drop", preventDefault);
-    };
-  }, []);
 
   const dropZoneProps = {
     onDragEnter: (e: DragEvent) => {

@@ -128,8 +128,12 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
     try {
       const detail = await getConversation(id);
       useChatStore.getState().loadConversation(detail.id, detail.model, detail.turns);
-      void navigate(`/c/${detail.id}`);
-      close();
+      void navigate(`/c/${encodeURIComponent(detail.id)}`);
+      // Not close(): that restores focus to the rail trigger, which is right for a
+      // dismissal but wrong here — we're navigating somewhere, and the route change
+      // moves focus into the new view. Racing it would leave focus on the rail with
+      // no way to tell where it went.
+      onClose();
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
     }

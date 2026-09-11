@@ -47,7 +47,13 @@ export function useConversationUrlSync(): void {
     // Only the hub can disagree: on /c/:id the loader already reconciled them, and
     // the other views have no opinion about which conversation is open.
     if (location.pathname !== "/" || !contextId) return;
-    if (navigated) newChat();
-    else if (activeTaskId) void navigate(`/c/${contextId}`, { replace: true });
+    // A turn still streaming has no saved transcript yet — persistConversation runs
+    // only when it settles, and reads contextId to know where to put it. Clearing
+    // here would destroy an answer mid-write, so send the conversation back to its
+    // own URL instead. It also covers the case where the agent assigned the
+    // contextId while the user was reading Files, so the URL was never written.
+    // Abandoning a live turn stays possible — that's what New chat is for.
+    if (activeTaskId) void navigate(`/c/${encodeURIComponent(contextId)}`, { replace: true });
+    else if (navigated) newChat();
   }, [location.key, location.pathname, contextId, activeTaskId, newChat, navigate]);
 }

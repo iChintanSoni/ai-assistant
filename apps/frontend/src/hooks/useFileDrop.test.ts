@@ -23,15 +23,6 @@ afterEach(() => {
   removeSpy.mockRestore();
 });
 
-test("registers window-level dragover/drop guards on mount and cleans them up on unmount", () => {
-  const { unmount } = renderHook(() => useFileDrop(vi.fn()));
-  expect(addSpy).toHaveBeenCalledWith("dragover", expect.any(Function));
-  expect(addSpy).toHaveBeenCalledWith("drop", expect.any(Function));
-  unmount();
-  expect(removeSpy).toHaveBeenCalledWith("dragover", expect.any(Function));
-  expect(removeSpy).toHaveBeenCalledWith("drop", expect.any(Function));
-});
-
 test("dragEnter with files shows the overlay; a non-file drag is ignored", () => {
   const { result } = renderHook(() => useFileDrop(vi.fn()));
 

@@ -9,7 +9,10 @@
 export type RouteView = "chat" | "files" | "settings";
 
 export function routeViewFromPath(pathname: string): RouteView {
-  if (pathname.startsWith("/files")) return "files";
-  if (pathname.startsWith("/settings")) return "settings";
+  // Segment match, not a prefix one: "/filesystem" is not the Files view, and
+  // mislabelling it would light up the rail and move focus for a path that only
+  // ever redirects.
+  if (pathname === "/files" || pathname.startsWith("/files/")) return "files";
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) return "settings";
   return "chat";
 }
