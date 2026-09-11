@@ -1,5 +1,6 @@
 /** Floating flyout listing past conversations — opened from the rail's History button. */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { MagnifyingGlassIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
   deleteConversation,
@@ -48,10 +49,10 @@ interface HistoryPanelProps {
   open: boolean;
   onClose: () => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
-  navigateToChat: () => void;
 }
 
-export function HistoryPanel({ open, onClose, triggerRef, navigateToChat }: HistoryPanelProps) {
+export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
+  const navigate = useNavigate();
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -127,7 +128,7 @@ export function HistoryPanel({ open, onClose, triggerRef, navigateToChat }: Hist
     try {
       const detail = await getConversation(id);
       useChatStore.getState().loadConversation(detail.id, detail.model, detail.turns);
-      navigateToChat();
+      void navigate(`/c/${detail.id}`);
       close();
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));

@@ -4,7 +4,8 @@ Full local development setup for all three services.
 
 ## Prerequisites
 
-- **Node.js 20.6+** (uses `node --env-file-if-exists`; developed against Node 24).
+- **Node.js 24+** (what the project is developed and CI-tested against; also the
+  floor `react-router` asks for, and `node --env-file-if-exists` needs 20.6+).
 - **[Ollama](https://ollama.com)** running locally (`OLLAMA_BASE_URL`, default
   `http://localhost:11434`), with at least one tool-calling chat model pulled:
   ```

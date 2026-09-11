@@ -1,5 +1,6 @@
 /** Files gallery page: every document, uploaded attachment, and generated image in one place. */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import {
   DocumentIcon,
   DocumentTextIcon,
@@ -69,11 +70,7 @@ function sortItems(items: AttachmentItem[], sort: SortKey): AttachmentItem[] {
   return sorted;
 }
 
-interface FilesPageProps {
-  navigateToChat: () => void;
-}
-
-export function FilesPage({ navigateToChat }: FilesPageProps) {
+export function FilesPage() {
   const [items, setItems] = useState<AttachmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -82,6 +79,7 @@ export function FilesPage({ navigateToChat }: FilesPageProps) {
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [sort, setSort] = useState<SortKey>("date");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const navigate = useNavigate();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   function refresh() {
@@ -117,7 +115,7 @@ export function FilesPage({ navigateToChat }: FilesPageProps) {
     try {
       const detail = await getConversation(id);
       useChatStore.getState().loadConversation(detail.id, detail.model, detail.turns);
-      navigateToChat();
+      void navigate(`/c/${detail.id}`);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     }
