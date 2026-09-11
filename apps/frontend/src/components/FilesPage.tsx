@@ -115,7 +115,7 @@ export function FilesPage() {
     try {
       const detail = await getConversation(id);
       useChatStore.getState().loadConversation(detail.id, detail.model, detail.turns);
-      void navigate(`/c/${detail.id}`);
+      void navigate(`/c/${encodeURIComponent(detail.id)}`);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
     }

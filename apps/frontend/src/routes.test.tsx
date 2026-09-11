@@ -184,6 +184,38 @@ test("back-navigation out of a conversation leaves a fresh chat behind", async (
   expect(router.state.location.pathname).toBe("/");
 });
 
+test("arriving at the hub with a turn still streaming restores its URL instead of destroying it", async () => {
+  // The agent can assign the contextId while the user is reading another view, so
+  // the conversation never got its URL. Clearing it here would bin an answer that
+  // is still being written and never gets persisted.
+  const { router } = renderAt(["/files"]);
+  await screen.findByRole("heading", { name: "Files" });
+  act(() => useChatStore.getState().setActiveTask("t1", "live-one"));
+
+  await act(async () => {
+    await router.navigate("/");
+  });
+
+  await waitFor(() => expect(router.state.location.pathname).toBe("/c/live-one"));
+  expect(useChatStore.getState().contextId).toBe("live-one");
+});
+
+test("clicking a rail button for the view you're already on doesn't stack history entries", async () => {
+  const user = userEvent.setup();
+  const { router } = renderAt(["/"]);
+
+  await user.click(screen.getByRole("button", { name: "Files" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/files"));
+  await user.click(screen.getByRole("button", { name: "Files" }));
+  await user.click(screen.getByRole("button", { name: "Files" }));
+
+  // One Back should be enough to leave — three entries deep would look broken.
+  await act(async () => {
+    await router.navigate(-1);
+  });
+  expect(router.state.location.pathname).toBe("/");
+});
+
 test("navigating to /files leaves the open conversation alone", async () => {
   const { router } = renderAt(["/"]);
   useChatStore.setState({ contextId: "keep-me" });

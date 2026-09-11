@@ -8,6 +8,8 @@ import { ClockIcon, Cog6ToothIcon, FolderIcon, PlusIcon } from "@heroicons/react
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { AuroraGlow } from "../components/AuroraGlow";
 import { HistoryPanel } from "../components/HistoryPanel";
+import { useAttachments } from "../hooks/useAttachments";
+import { useBlockStrayFileDrops } from "../hooks/useBlockStrayFileDrops";
 import { useConversationUrlSync } from "../hooks/useConversationUrlSync";
 import { useFocusOnRouteChange } from "../hooks/useFocusOnRouteChange";
 import { USER_NAME } from "../lib/config";
@@ -18,17 +20,32 @@ import { useChatStore } from "../store/chat";
 const SHELL_CLASS =
   "relative flex h-screen w-screen overflow-hidden bg-white font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200";
 
+export type AttachmentsContext = ReturnType<typeof useAttachments>;
+
 export function RootLayout() {
   const setModels = useChatStore((s) => s.setModels);
   const setModelsError = useChatStore((s) => s.setModelsError);
   const newChat = useChatStore((s) => s.newChat);
   const navigate = useNavigate();
-  const view = routeViewFromPath(useLocation().pathname);
+  const { pathname } = useLocation();
+  const view = routeViewFromPath(pathname);
+  // useNavigate doesn't dedupe a push to the path you're already on the way <Link>
+  // does, so clicking a rail button twice would stack identical history entries and
+  // make Back look broken.
+  const go = (to: string) => {
+    if (pathname !== to) void navigate(to);
+  };
   const [historyOpen, setHistoryOpen] = useState(false);
   const historyButtonRef = useRef<HTMLButtonElement>(null);
 
   useFocusOnRouteChange();
   useConversationUrlSync();
+  useBlockStrayFileDrops();
+  // Staged attachments live here, not in the chat route: the route unmounts on a
+  // trip to Files or Settings, which would silently discard files the user had
+  // already picked (and leak their object URLs, since nothing revokes them on
+  // unmount). Handed to the chat view through the outlet.
+  const attachments = useAttachments();
 
   useEffect(() => {
     let active = true;
@@ -50,19 +67,19 @@ export function RootLayout() {
       <Sidebar
         onNewChat={() => {
           newChat();
-          void navigate("/");
+          go("/");
         }}
         historyButtonRef={historyButtonRef}
         historyOpen={historyOpen}
         onToggleHistory={() => setHistoryOpen((v) => !v)}
         filesOpen={view === "files"}
         onOpenFiles={() => {
-          void navigate("/files");
+          go("/files");
           setHistoryOpen(false);
         }}
         settingsOpen={view === "settings"}
         onOpenSettings={() => {
-          void navigate("/settings");
+          go("/settings");
           setHistoryOpen(false);
         }}
       />
@@ -71,7 +88,7 @@ export function RootLayout() {
         onClose={() => setHistoryOpen(false)}
         triggerRef={historyButtonRef}
       />
-      <Outlet />
+      <Outlet context={attachments} />
     </div>
   );
 }

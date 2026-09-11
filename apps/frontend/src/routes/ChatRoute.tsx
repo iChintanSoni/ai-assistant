@@ -1,17 +1,19 @@
 /** The chat view: the empty-state hub, or the live transcript once a turn exists. */
+import { useOutletContext } from "react-router";
 import { Composer } from "../components/Composer";
 import { Conversation } from "../components/Conversation";
 import { DropOverlay } from "../components/DropOverlay";
-import { useAttachments } from "../hooks/useAttachments";
 import { useFileDrop } from "../hooks/useFileDrop";
 import { USER_NAME } from "../lib/config";
 import { useChatStore } from "../store/chat";
+import type { AttachmentsContext } from "./RootLayout";
 import { PageMain } from "./PageMain";
 
 export function ChatRoute() {
   const turns = useChatStore((s) => s.turns);
   const modelsError = useChatStore((s) => s.modelsError);
-  const attachments = useAttachments();
+  // Owned by RootLayout so it survives a trip to Files/Settings — see there.
+  const attachments = useOutletContext<AttachmentsContext>();
   const { isDraggingFiles, dropZoneProps } = useFileDrop(attachments.addFiles);
   const hasChat = turns.length > 0;
 
