@@ -156,6 +156,18 @@ test("that mid-stream URL rewrite replaces the hub entry rather than stacking on
   expect(router.state.location.pathname).toBe("/files");
 });
 
+test("a contextId arriving while the user is on another view doesn't yank them to chat", async () => {
+  const { router } = renderAt(["/files"]);
+  await screen.findByRole("heading", { name: "Files" });
+
+  act(() => useChatStore.getState().setActiveTask("t1", "mid-stream"));
+
+  // The old hand-rolled hook called setView("chat") on any contextId change, pulling
+  // the user off whatever page they were reading. Only the hub reconciles now.
+  expect(router.state.location.pathname).toBe("/files");
+  expect(screen.getByRole("heading", { name: "Files" })).toBeInTheDocument();
+});
+
 test("back-navigation out of a conversation leaves a fresh chat behind", async () => {
   vi.mocked(getConversation).mockResolvedValue(detail("c1"));
   const { router } = renderAt(["/"]);
