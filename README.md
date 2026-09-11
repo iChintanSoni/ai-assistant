@@ -1,7 +1,7 @@
 # ai-assistant
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Node.js 20.6+](https://img.shields.io/badge/Node.js-20.6%2B-339933?logo=node.js&logoColor=white)
+![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Requires Ollama](https://img.shields.io/badge/requires-Ollama-black?logo=ollama&logoColor=white)
 
@@ -43,7 +43,7 @@ Full diagram and data flow: [docs/architecture.md](docs/architecture.md).
 
 ## Quickstart
 
-Prerequisites: Node.js 20.6+, [Ollama](https://ollama.com) running locally
+Prerequisites: Node.js 24+, [Ollama](https://ollama.com) running locally
 with a tool-calling chat model pulled:
 
 ```

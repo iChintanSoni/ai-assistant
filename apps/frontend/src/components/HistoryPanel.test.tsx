@@ -3,6 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router")>()),
+  useNavigate: () => navigate,
+}));
 vi.mock("../lib/history", () => ({
   deleteConversation: vi.fn(),
   getConversation: vi.fn(),
@@ -21,15 +26,15 @@ function conv(overrides: Partial<ConversationSummary> = {}): ConversationSummary
 function renderPanel(open = true) {
   const ref = createRef<HTMLButtonElement>();
   const onClose = vi.fn();
-  const navigateToChat = vi.fn();
-  const utils = render(<HistoryPanel open={open} onClose={onClose} triggerRef={ref} navigateToChat={navigateToChat} />);
-  return { ...utils, onClose, navigateToChat };
+  const utils = render(<HistoryPanel open={open} onClose={onClose} triggerRef={ref} />);
+  return { ...utils, onClose };
 }
 
 beforeEach(() => {
   vi.mocked(listConversations).mockReset().mockResolvedValue([]);
   vi.mocked(getConversation).mockReset();
   vi.mocked(deleteConversation).mockReset().mockResolvedValue(undefined);
+  navigate.mockReset();
   useChatStore.setState({ turns: [], contextId: null });
 });
 
@@ -69,13 +74,13 @@ test("opening a conversation loads it into the store and navigates to chat", asy
   vi.mocked(listConversations).mockResolvedValue([conv()]);
   vi.mocked(getConversation).mockResolvedValue({ ...conv(), turns: [] });
   const user = userEvent.setup();
-  const { navigateToChat, onClose } = renderPanel();
+  const { onClose } = renderPanel();
 
   await waitFor(() => expect(screen.getByText("First conversation")).toBeInTheDocument());
   await user.click(screen.getByText("First conversation"));
 
   await waitFor(() => expect(useChatStore.getState().contextId).toBe("c1"));
-  expect(navigateToChat).toHaveBeenCalled();
+  expect(navigate).toHaveBeenCalledWith("/c/c1");
   expect(onClose).toHaveBeenCalled();
 });
 
@@ -83,13 +88,13 @@ test("a failed conversation load shows an error instead of navigating", async ()
   vi.mocked(listConversations).mockResolvedValue([conv()]);
   vi.mocked(getConversation).mockRejectedValue(new Error("gone"));
   const user = userEvent.setup();
-  const { navigateToChat } = renderPanel();
+  renderPanel();
 
   await waitFor(() => expect(screen.getByText("First conversation")).toBeInTheDocument());
   await user.click(screen.getByText("First conversation"));
 
   await waitFor(() => expect(screen.getByText("gone")).toBeInTheDocument());
-  expect(navigateToChat).not.toHaveBeenCalled();
+  expect(navigate).not.toHaveBeenCalled();
 });
 
 test("delete requires a confirming second click", async () => {

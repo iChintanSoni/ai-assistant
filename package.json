@@ -17,6 +17,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=24"
+  },
   "workspaces": [
     "apps/frontend",
     "apps/agent",

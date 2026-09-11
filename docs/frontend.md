@@ -9,17 +9,56 @@ patterns rather than inventing new ones.
 
 ## Layout
 
-`App.tsx` is a single non-scrolling viewport: a thin icon rail on the left
-(new chat, history, files, settings), an aurora glow background, and one
-focal interaction — an empty-state hub that becomes a streaming conversation
-once a message is sent. History is a floating flyout panel triggered from
-the rail (not a docked sidebar — the design system explicitly avoids a
-heavy/opaque sidebar); Files and Settings are full pages, switched (along
-with the chat view) via `useConversationRouting.ts`, which also keeps the
-URL in sync (`/`, `/c/:id`, `/files`, `/settings`) for deep links and
-back/forward. There is no separate "documents" rail icon — browsing/deleting
-the persistent document library lives in the Files page alongside
-attachments and generated images.
+`App.tsx` is just the router's entry point (`createBrowserRouter` +
+`RouterProvider`). The shell it renders lives in `routes/RootLayout.tsx`: a
+single non-scrolling viewport with a thin icon rail on the left (new chat,
+history, files, settings), an aurora glow background, and one focal
+interaction — an empty-state hub that becomes a streaming conversation once a
+message is sent. History is a floating flyout panel triggered from the rail
+(not a docked sidebar — the design system explicitly avoids a heavy/opaque
+sidebar). There is no separate "documents" rail icon — browsing/deleting the
+persistent document library lives in the Files page alongside attachments and
+generated images.
+
+## Routing — `routes.tsx`
+
+`react-router` in data-router mode. `routes.tsx` exports the route table as a
+plain array (not a built router) so tests can mount it in a fresh
+`createMemoryRouter` per test:
+
+| Route | Renders |
+| --- | --- |
+| `/` | `ChatRoute` — the hub, or the live transcript |
+| `/c/:id` | `ChatRoute`, with a loader that restores the conversation |
+| `/files` | `FilesRoute` → `FilesPage` |
+| `/settings` | `SettingsRoute` → `SettingsPage` |
+| `*` | redirect to `/` — an unknown path used to fall through to the chat view, so it still does rather than dead-ending on the router's default error page |
+
+Every route renders through the shared `routes/PageMain.tsx` `<main>`, which is
+focusable so `hooks/useFocusOnRouteChange.ts` can move focus into the new view
+on navigation (keyed on the *view*, not the pathname — see below). The root
+route's `HydrateFallback` paints the glow alone while an initial loader runs,
+so a refreshed `/c/:id` never flashes a blank page.
+
+Two pieces carry the subtlety, both of which exist because the store and the
+URL are separate sources of truth for "which conversation is open":
+
+- **`conversationLoader`'s early return** (`routes.tsx`). A brand-new chat
+  rewrites its own URL to `/c/:id` the moment the agent assigns a contextId —
+  *while the turn is still streaming*. The loader therefore skips its fetch when
+  the store is already on that conversation; without it, loading the
+  not-yet-saved transcript would blank the screen mid-answer. It also means the
+  History flyout and Files page (which load a conversation themselves, so a
+  failure can be reported in place) don't trigger a second fetch when they
+  navigate.
+- **`hooks/useConversationUrlSync.ts`**. Reconciles the two at the hub, where
+  "`/` is showing but the store holds a contextId" has two opposite causes: a
+  navigation landed there (Back, New chat → clear the conversation), or the
+  agent just assigned a contextId mid-stream (→ point the URL at it, with
+  `replace`, so Back returns where the user came from rather than the stale
+  hub). `location.key` distinguishes the first; `activeTaskId` the second. It
+  must be hosted by `RootLayout`, which outlives route changes — see
+  [gotchas.md](gotchas.md) for why the obvious alternatives don't work.
 
 ## State — `store/chat.ts`
 

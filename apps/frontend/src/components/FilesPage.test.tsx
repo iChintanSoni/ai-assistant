@@ -2,6 +2,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-router")>()),
+  useNavigate: () => navigate,
+}));
 vi.mock("../lib/attachments", () => ({ listAttachments: vi.fn(), deleteAttachment: vi.fn() }));
 vi.mock("../lib/documents", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/documents")>();
@@ -31,13 +36,12 @@ function item(overrides: Partial<AttachmentItem> = {}): AttachmentItem {
 }
 
 function renderPage() {
-  const navigateToChat = vi.fn();
-  const utils = render(<FilesPage navigateToChat={navigateToChat} />);
-  return { ...utils, navigateToChat };
+  return render(<FilesPage />);
 }
 
 beforeEach(() => {
   vi.mocked(listAttachments).mockReset().mockResolvedValue([]);
+  navigate.mockReset();
   vi.mocked(deleteAttachment).mockReset().mockResolvedValue(undefined);
   vi.mocked(deleteDocument).mockReset().mockResolvedValue(undefined);
   vi.mocked(getConversation).mockReset();
@@ -180,13 +184,13 @@ test("clicking a single used-in conversation link navigates to that chat", async
   vi.mocked(listAttachments).mockResolvedValue([item({ usedIn: [{ id: "c1", title: "My chat" }] })]);
   vi.mocked(getConversation).mockResolvedValue({ id: "c1", model: "m1", turns: [], title: "My chat", createdAt: 0, updatedAt: 0 });
   const user = userEvent.setup();
-  const { navigateToChat } = renderPage();
+  renderPage();
   await waitFor(() => expect(screen.getByText("My chat")).toBeInTheDocument());
 
   await user.click(screen.getByText("My chat"));
 
   await waitFor(() => expect(useChatStore.getState().contextId).toBe("c1"));
-  expect(navigateToChat).toHaveBeenCalled();
+  expect(navigate).toHaveBeenCalledWith("/c/c1");
 });
 
 test("the sort control reorders items by name", async () => {

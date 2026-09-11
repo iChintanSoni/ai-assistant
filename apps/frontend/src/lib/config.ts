@@ -9,3 +9,6 @@ export const FILE_STORAGE_URL =
 
 /** Max files simultaneously attached/active for a conversation (documents + other attachments combined). */
 export const MAX_ATTACHMENTS = 5;
+
+/** Who the assistant is greeting. Single-user app — see the README's "Not built". */
+export const USER_NAME = "Chintan";

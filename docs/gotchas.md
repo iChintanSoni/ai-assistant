@@ -134,6 +134,44 @@ regardless of which `@types/node` typed it, really is a `Uint8Array` at
 runtime), producing a genuine instance of your own `Buffer` type for
 everything downstream.
 
+## A route loader that writes to an external store races the location it belongs to
+
+**General React Router + external-store lesson, not specific to this repo.** In a
+data router (`createBrowserRouter`), a route loader runs *before* the navigation
+commits — that's the point of it. If the loader writes into an external store
+(zustand here, but any `useSyncExternalStore`-style source behaves the same), there
+is a window where the store already describes the destination while `useLocation()`
+still reports the origin. Worse, the store's own update can trigger the render in
+which your components observe that inconsistency, so the router's `navigation.state`
+is not a usable guard: `useNavigation()` reads a context value React may not have
+committed yet, and it can still report `"idle"` mid-navigation.
+
+It surfaced here in the `react-router` migration. `conversationLoader` loads a
+conversation into `useChatStore`, and `useConversationUrlSync` watches for the hub
+(`/`) showing while the store holds a `contextId` — which is how a brand-new chat
+learns to rewrite its URL once the agent assigns one mid-stream. During any
+navigation to `/c/:id`, that exact condition is true *for one render* before the
+location catches up, so the hook fired a `replace` into the conversation. The user's
+`push` was silently demoted to a `replace`, collapsing two history entries into one,
+and Back stopped working — the symptom that exposed it was a test asserting Back out
+of a conversation left a fresh chat behind, where the router never moved because
+there was no longer an entry to go back to.
+
+**Fix**: discriminate on a *state fact written by the thing you care about*, not on
+timing. `setActiveTask` sets `activeTaskId` alongside `contextId` for a live task,
+while `loadConversation`/`newChat` null it — so `activeTaskId` means "this contextId
+came from a task streaming in this tab" and a loader-restored conversation can never
+impersonate one. Two related traps in the same area, both worth knowing:
+
+- **Host this kind of reconciliation in a component that outlives route changes.**
+  `/` and `/c/:id` are separate route entries, so a `useRef` in the route element is
+  reset by the very navigation it's trying to detect. It belongs in the layout route.
+- **Keep it in one effect.** Split into "clear the conversation" and "sync the URL",
+  the two run in the same commit and the second reads a `contextId` the first has not
+  cleared yet — navigating straight back into the conversation the user just left.
+  Child effects also run before parent effects, so moving one up a level doesn't fix
+  the ordering.
+
 ## A local single-GPU Ollama instance serializes requests — don't `Promise.all` them
 
 Firing multiple chunk-summarization LLM calls concurrently via `Promise.all`
