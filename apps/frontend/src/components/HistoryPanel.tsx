@@ -209,7 +209,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
                 <button
                   type="button"
                   onClick={() => void openConversation(item.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl px-2 py-2 text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                  className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl px-2 py-2 text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:min-h-11"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">
                     {item.title}
