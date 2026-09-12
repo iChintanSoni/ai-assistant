@@ -163,7 +163,7 @@ export function FilesPage() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search files..."
                 aria-label="Search files"
-                className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
             <KindFilterControl value={kindFilter} onChange={setKindFilter} />
@@ -249,7 +249,7 @@ function GridView({
   onGoToConversation: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-4 px-1 pt-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 px-1 pt-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
       {items.map((item) => (
         <FileTile
           key={item.id}
@@ -310,7 +310,7 @@ function FileTile({
         type="button"
         aria-label={confirming ? `Confirm delete "${item.originalName}"` : `Delete "${item.originalName}"`}
         onClick={() => onDelete(item)}
-        className={`absolute top-2 right-2 flex size-7 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+        className={`absolute top-2 right-2 flex size-10 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 pointer-coarse:opacity-100 ${
           confirming
             ? "bg-rose-100 text-rose-600 opacity-100 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
             : "bg-white/80 text-slate-500 hover:bg-white hover:text-slate-800 dark:bg-slate-900/80 dark:text-slate-400 dark:hover:text-slate-100"
@@ -330,7 +330,7 @@ function FileTile({
             <button
               type="button"
               onClick={() => onGoToConversation(item.usedIn[0]!.id)}
-              className="truncate text-left text-xs text-blue-500 hover:underline dark:text-blue-400"
+              className="min-h-9 truncate text-left text-xs text-blue-500 hover:underline pointer-coarse:min-h-11 dark:text-blue-400"
             >
               {label}
             </button>
@@ -411,7 +411,7 @@ function ListView({
                   type="button"
                   aria-label={`Go to "${item.usedIn[0]!.title}"`}
                   onClick={() => onGoToConversation(item.usedIn[0]!.id)}
-                  className="hidden shrink-0 rounded-full px-2 py-1 text-xs text-blue-500 opacity-0 transition-opacity group-hover:opacity-100 hover:underline focus-visible:opacity-100 md:block dark:text-blue-400"
+                  className="hidden shrink-0 rounded-full px-2 py-1 text-xs text-blue-500 opacity-0 transition-opacity group-hover:opacity-100 hover:underline focus-visible:opacity-100 md:block pointer-coarse:block pointer-coarse:min-h-11 pointer-coarse:opacity-100 dark:text-blue-400"
                 >
                   Open chat
                 </button>
@@ -420,7 +420,7 @@ function ListView({
                 type="button"
                 aria-label={confirmingId === item.id ? `Confirm delete "${item.originalName}"` : `Delete "${item.originalName}"`}
                 onClick={() => onDelete(item)}
-                className={`mr-1 flex size-8 shrink-0 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+                className={`mr-1 flex size-10 shrink-0 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 pointer-coarse:opacity-100 ${
                   confirmingId === item.id
                     ? "bg-rose-100 text-rose-600 opacity-100 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
                     : "text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
@@ -482,7 +482,7 @@ function KindFilterControl({ value, onChange }: { value: KindFilter; onChange: (
             aria-checked={checked}
             tabIndex={checked ? 0 : -1}
             onClick={() => onChange(v)}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+            className={`min-h-10 min-w-10 rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:min-h-11 pointer-coarse:min-w-11 ${
               checked
                 ? "bg-white text-slate-900 dark:bg-slate-700 dark:text-slate-100"
                 : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
@@ -525,7 +525,7 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (v: ViewMode
             aria-label={label}
             tabIndex={checked ? 0 : -1}
             onClick={() => onChange(value)}
-            className={`flex size-8 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+            className={`flex size-10 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 ${
               checked
                 ? "bg-white text-slate-900 dark:bg-slate-700 dark:text-slate-100"
                 : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
@@ -541,7 +541,7 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (v: ViewMode
 
 function SortSelect({ sort, onChange }: { sort: SortKey; onChange: (v: SortKey) => void }) {
   return (
-    <label className="flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pr-2 pl-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/80 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80">
+    <label className="flex min-h-10 items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pr-2 pl-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/80 pointer-coarse:min-h-11 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80">
       <span className="sr-only">Sort by</span>
       <select
         value={sort}

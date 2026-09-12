@@ -185,7 +185,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search conversations..."
           aria-label="Search conversations"
-          className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
         />
       </div>
 
