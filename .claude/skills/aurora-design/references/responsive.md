@@ -60,9 +60,11 @@ mental model and you end up maintaining two designs instead of one that grows.
   of flow entirely. What the direction actually buys is that `main` takes the full
   width once the rail is hidden.
 - **`main` must reserve the bar's height**, because a fixed bar cannot push content.
-  Derive it rather than guessing: the bar is `pt-2` + `size-11` + its safe-area
-  padding, i.e. `calc(3.25rem + max(0.5rem, env(safe-area-inset-bottom)))`. A magic
-  `pb-20` is wrong in both directions and drifts the moment the bar changes.
+  Define it once — this app keeps it as `--nav-h` in `index.css`
+  (`calc(3.25rem + max(0.5rem, env(safe-area-inset-bottom)))`: the bar's `pt-2` plus
+  a 44px target) and references it as `pb-[var(--nav-h)]`. Retyping the expression
+  at each call site drifts the moment the bar changes; a magic `pb-20` is wrong in
+  both directions from the start.
 - The **shell** still never scrolls. A *focal pane* may scroll inside it — that's
   the one relaxation of the single-screen rule, and it's what makes a long
   transcript or a file grid usable on a phone.
@@ -75,16 +77,17 @@ Bottom-anchored because that's where thumbs are, and because 64px of a 375px
 viewport is too much to spend on chrome.
 
 ```tsx
-{/* Phones */}
+{/* One <nav>, two lanes. Not two components: jsdom never loads the stylesheet, so
+    a second `md:hidden` nav would duplicate every button for tests and make each
+    getByRole ambiguous. */}
 <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around
                 bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]
                 ring-1 ring-slate-200/70 backdrop-blur-md
-                md:hidden dark:bg-slate-900/70 dark:ring-slate-700/60">
-  …RailButtons…
+                md:relative md:inset-auto md:h-full md:w-16 md:flex-col md:justify-between
+                md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none">
+  <div className="flex items-center gap-1 md:flex-col md:gap-2">…</div>
+  <div className="flex items-center gap-1 md:flex-col md:gap-2">…</div>
 </nav>
-
-{/* md: and up — unchanged from layout.md */}
-<nav className="relative z-20 hidden h-full w-16 flex-col items-center justify-between py-6 md:flex">
 ```
 
 - **`env(safe-area-inset-*)` is 0 unless the page opts in.** It only reports a real
@@ -154,9 +157,12 @@ One row at 375px gives the textarea 37px. Stack it instead:
 - The textarea needs **`col-span-full`** on the phone row — without it, auto-flow
   drops it into a single 1fr cell beside the controls and you are back to a ~37px
   input. `md:col-span-1` resets it when the pill collapses to one row.
-- The phone grid has **four** columns (attach · flexible · model · send) and the
-  `md:` grid has five (the usage gauge rejoins). Column starts are therefore
+- The phone grid has **five** columns (attach · flexible · model · mic · send) and
+  the `md:` grid has six (the usage gauge rejoins). Column starts are therefore
   breakpoint-specific — count them when adding a control.
+- Send and the mic coexist rather than sharing a slot: voice input appends to an
+  existing draft, so swapping the mic out for Send would make dictation reachable
+  only from an empty composer.
 - `py-2.5` on the textarea is what lifts it to the 44px touch floor; the
   auto-resize reads `scrollHeight`, which includes padding under `border-box`.
 - The `UsageGauge` is `hidden sm:flex` — it's a secondary readout, and the model

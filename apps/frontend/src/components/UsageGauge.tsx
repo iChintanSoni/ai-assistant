@@ -126,7 +126,7 @@ export function UsageGauge() {
         <div
           role="dialog"
           aria-label="Context usage details"
-          className="absolute right-0 bottom-full z-30 mb-2 w-64 rounded-2xl bg-white/95 p-3 text-sm ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/95 dark:ring-slate-700/60"
+          className="absolute right-0 bottom-full z-30 mb-2 w-[min(16rem,calc(100vw-2rem))] rounded-2xl bg-white/95 p-3 text-sm ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/95 dark:ring-slate-700/60"
         >
           {!contextLength ? (
             <p className="text-slate-500 dark:text-slate-400">Context size for this model is unknown.</p>

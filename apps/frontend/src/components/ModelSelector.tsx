@@ -68,7 +68,7 @@ export function ModelSelector() {
         <ul
           role="listbox"
           aria-label="Select model"
-          className="absolute right-0 bottom-full z-30 mb-2 max-h-80 max-h-[60dvh] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto overflow-auto rounded-2xl bg-white/95 p-1.5 ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/95 dark:ring-slate-700/60"
+          className="absolute right-0 bottom-full z-30 mb-2 max-h-[60dvh] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl bg-white/95 p-1.5 ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/95 dark:ring-slate-700/60"
         >
           {models.map((m) => {
             const isSelected = m.name === selected;

@@ -204,7 +204,7 @@ export function SettingsPage() {
           <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase dark:text-slate-500">Models</h2>
 
           <form onSubmit={(e) => void handleDownload(e)} className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-white/70 px-4 py-2.5 sm:min-w-56 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
+            <div className="flex min-w-56 flex-1 items-center gap-2 rounded-full bg-white/70 px-4 py-2.5 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
               <input
                 type="text"
                 value={downloadName}
@@ -212,7 +212,7 @@ export function SettingsPage() {
                 placeholder="e.g. llama3.1:8b"
                 aria-label="Model name to download"
                 disabled={pull !== null}
-                className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden disabled:opacity-50 pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden disabled:opacity-50 pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
             <button
@@ -228,7 +228,7 @@ export function SettingsPage() {
           {pull && <PullProgressRow pull={pull} />}
           {actionError && <p className="px-2 py-1 text-sm text-rose-500 dark:text-rose-400">{actionError}</p>}
 
-          <div className="flex min-w-0 items-center gap-2 rounded-full bg-white/70 px-3 py-2 sm:min-w-56 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
+          <div className="flex min-w-56 flex-1 items-center gap-2 rounded-full bg-white/70 px-3 py-2 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
             <MagnifyingGlassIcon className="size-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
             <input
               type="text"
@@ -236,7 +236,7 @@ export function SettingsPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search models..."
               aria-label="Search models"
-              className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
 

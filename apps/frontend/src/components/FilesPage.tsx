@@ -155,7 +155,7 @@ export function FilesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-white/70 px-3 py-2 sm:min-w-56 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
+            <div className="flex min-w-56 flex-1 items-center gap-2 rounded-full bg-white/70 px-3 py-2 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
               <MagnifyingGlassIcon className="size-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
               <input
                 type="text"
@@ -163,7 +163,7 @@ export function FilesPage() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search files..."
                 aria-label="Search files"
-                className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
             <KindFilterControl value={kindFilter} onChange={setKindFilter} />
@@ -330,7 +330,7 @@ function FileTile({
             <button
               type="button"
               onClick={() => onGoToConversation(item.usedIn[0]!.id)}
-              className="min-h-9 truncate text-left text-xs text-blue-500 hover:underline pointer-coarse:min-h-11 dark:text-blue-400"
+              className="min-h-10 truncate text-left text-xs text-blue-500 hover:underline pointer-coarse:min-h-11 dark:text-blue-400"
             >
               {label}
             </button>

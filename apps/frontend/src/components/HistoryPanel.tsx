@@ -8,6 +8,7 @@ import {
   listConversations,
   type ConversationSummary,
 } from "../lib/history";
+import { isCoarsePointer } from "../lib/pointer";
 import { useChatStore } from "../store/chat";
 
 const GROUP_ORDER = ["Today", "Yesterday", "Previous 7 days", "Older"] as const;
@@ -90,7 +91,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
       setLoadError(null);
       // Not on touch: focusing here raises the soft keyboard before the user has
       // seen the sheet, and shrinks it to a couple of rows.
-      if (!window.matchMedia?.("(pointer: coarse)").matches) searchRef.current?.focus();
+      if (!isCoarsePointer()) searchRef.current?.focus();
     }
   }, [open]);
 
@@ -164,7 +165,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
       // bar — at 375px it ran 25px off-screen. Below md: it becomes a bottom sheet;
       // the dismissal contract (Escape, outside click, focus back to the trigger)
       // is unchanged, only the shape is.
-      className="fixed inset-x-0 bottom-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] z-30 flex max-h-[60dvh] flex-col gap-2 rounded-t-3xl bg-white/80 p-3 ring-1 ring-slate-200/70 backdrop-blur-md md:inset-x-auto md:top-6 md:bottom-auto md:max-h-[70vh] md:w-80 md:rounded-3xl md:left-20 dark:bg-slate-900/80 dark:ring-slate-700/60"
+      className="fixed inset-x-0 bottom-[calc(var(--keyboard-inset,0px)+var(--nav-h))] z-30 flex max-h-[60dvh] flex-col gap-2 rounded-t-3xl bg-white/80 p-3 ring-1 ring-slate-200/70 backdrop-blur-md md:inset-x-auto md:top-6 md:bottom-auto md:max-h-[70vh] md:w-80 md:rounded-3xl md:left-20 dark:bg-slate-900/80 dark:ring-slate-700/60"
     >
       <div className="flex items-center justify-between px-1">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-200">History</span>
@@ -187,7 +188,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search conversations..."
           aria-label="Search conversations"
-          className="min-h-9 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
         />
       </div>
 

@@ -20,6 +20,12 @@ export function useKeyboardInset(): number {
     if (!vv) return;
     function update() {
       if (!vv) return;
+      // Pinch-zoom shrinks visualViewport too. Without this, zooming to 2x reads as
+      // a ~half-viewport keyboard and pads most of the app out of view.
+      if (vv.scale !== 1) {
+        setInset(0);
+        return;
+      }
       // offsetTop accounts for the page being scrolled up to reveal the caret.
       const covered = window.innerHeight - vv.height - vv.offsetTop;
       // Sub-pixel noise and the browser's own toolbar animation both show up here;

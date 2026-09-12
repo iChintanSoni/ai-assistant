@@ -10,6 +10,7 @@ import { useVoiceInput } from "../hooks/useVoiceInput";
 import type { PendingAttachment } from "../hooks/useAttachments";
 import { acceptFor } from "../lib/models";
 import { DOCUMENT_ACCEPT } from "../lib/documents";
+import { isCoarsePointer } from "../lib/pointer";
 
 interface ComposerProps {
   attachments: PendingAttachment[];
@@ -31,6 +32,8 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // Mirrors submit()'s guard — an attachment with no text is a valid message.
+  const canSend = text.trim().length > 0 || attachments.length > 0;
   const fileInput = useRef<HTMLInputElement>(null);
   const textArea = useRef<HTMLTextAreaElement>(null);
   const voice = useVoiceInput((transcript) =>
@@ -79,7 +82,7 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
       <div
         data-testid="composer-surface"
         data-expanded={hasAttachments}
-        className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 bg-white/70 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] dark:bg-slate-900/70 dark:ring-slate-700/60 ${
+        className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-x-2 bg-white/70 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto_auto] dark:bg-slate-900/70 dark:ring-slate-700/60 ${
           hasAttachments
             ? "grid-rows-[auto_auto_auto] gap-y-3 rounded-3xl px-4 py-3 md:min-h-64 md:grid-rows-[auto_minmax(1.5rem,1fr)_auto] md:px-5 md:py-4"
             : "grid-rows-[auto_auto] gap-y-2 rounded-3xl px-4 py-3 md:grid-rows-1 md:gap-y-0 md:rounded-full md:px-3 md:py-2.5"
@@ -121,8 +124,7 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           onKeyDown={(e) => {
             // Only a keyboard with a real Shift+Enter gets Enter-to-send; on a soft
             // keyboard Enter has to stay a newline, and Send is the button.
-            const softKeyboard = window.matchMedia?.("(pointer: coarse)").matches;
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !softKeyboard) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !isCoarsePointer()) {
               e.preventDefault();
               void submit();
             }
@@ -137,7 +139,7 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
         />
 
         <div
-          className={`col-start-2 justify-self-end md:col-start-3 md:justify-self-auto ${
+          className={`col-start-2 hidden justify-self-end sm:block md:col-start-3 md:justify-self-auto ${
             hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
           }`}
         >
@@ -151,57 +153,62 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           <ModelSelector />
         </div>
 
-        {/* With text pending, the trailing control becomes Send. A soft keyboard has
-            no Shift+Enter, so Enter has to insert a newline there — which leaves no
-            way to send at all without this button. */}
+        {/* The mic is always present — voice input appends to an existing draft, so
+            swapping it out for Send would make dictation reachable only from an
+            empty composer. Send appears alongside it, because a soft keyboard has
+            no Shift+Enter: Enter has to insert a newline there, which leaves a
+            button as the only way to send. */}
         {isStreaming ? (
           <button
             type="button"
             onClick={() => void stop()}
             aria-label="Stop"
-            className={`col-start-4 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 md:col-start-5 dark:bg-slate-700 dark:hover:bg-slate-600 ${
+            className={`col-start-5 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 md:col-start-6 dark:bg-slate-700 dark:hover:bg-slate-600 ${
               hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
             }`}
           >
             <StopIcon className="size-5" aria-hidden="true" />
           </button>
-        ) : text.trim() ? (
-          <button
-            type="button"
-            aria-label="Send"
-            onClick={() => void submit()}
-            disabled={isSending}
-            className={`col-start-4 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 pointer-coarse:size-11 md:col-start-5 dark:bg-slate-700 dark:hover:bg-slate-600 ${
-              hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
-            }`}
-          >
-            <ArrowUpIcon className="size-5" aria-hidden="true" />
-          </button>
         ) : (
-          <button
-            type="button"
-            aria-label={
-              voice.state === "recording"
-                ? "Stop recording"
-                : voice.state === "transcribing"
-                  ? "Transcribing…"
-                  : "Record voice message"
-            }
-            onClick={voice.toggle}
-            disabled={voice.state === "transcribing" || isSending}
-            className={`col-start-4 flex size-10 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 pointer-coarse:size-11 md:col-start-5 ${
-              hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
-            } ${
-              voice.state === "recording"
-                ? "bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
-                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-            }`}
-          >
-            <MicrophoneIcon
-              className={`size-5 ${voice.state !== "idle" ? "animate-pulse" : ""}`}
-              aria-hidden="true"
-            />
-          </button>
+          <>
+            <button
+              type="button"
+              aria-label={
+                voice.state === "recording"
+                  ? "Stop recording"
+                  : voice.state === "transcribing"
+                    ? "Transcribing…"
+                    : "Record voice message"
+              }
+              onClick={voice.toggle}
+              disabled={voice.state === "transcribing" || isSending}
+              className={`col-start-4 flex size-10 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 pointer-coarse:size-11 md:col-start-5 ${
+                hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
+              } ${
+                voice.state === "recording"
+                  ? "bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
+                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              }`}
+            >
+              <MicrophoneIcon
+                className={`size-5 ${voice.state !== "idle" ? "animate-pulse" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+            {canSend && (
+              <button
+                type="button"
+                aria-label="Send"
+                onClick={() => void submit()}
+                disabled={isSending}
+                className={`col-start-5 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 pointer-coarse:size-11 md:col-start-6 dark:bg-slate-700 dark:hover:bg-slate-600 ${
+                  hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
+                }`}
+              >
+                <ArrowUpIcon className="size-5" aria-hidden="true" />
+              </button>
+            )}
+          </>
         )}
       </div>
 

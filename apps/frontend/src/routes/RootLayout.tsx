@@ -68,7 +68,17 @@ export function RootLayout() {
   }, [setModels, setModelsError]);
 
   return (
-    <div className={SHELL_CLASS} style={keyboardInset ? { paddingBottom: keyboardInset } : undefined}>
+    <div
+      className={SHELL_CLASS}
+      // Also published as a custom property: padding can't move the position:fixed
+      // nav or the History sheet, and on iOS those are exactly what the keyboard
+      // covers.
+      style={
+        keyboardInset
+          ? ({ paddingBottom: keyboardInset, "--keyboard-inset": `${keyboardInset}px` } as React.CSSProperties)
+          : undefined
+      }
+    >
       {/* The nav is first in the DOM — it's a landmark, and on desktop it's also
           visually first. On a phone the bar is visually last, so the skip link is
           what keeps that from costing keyboard users five tabs before the
@@ -100,12 +110,12 @@ export function RootLayout() {
           setHistoryOpen(false);
         }}
       />
-      <Outlet context={attachments} />
       <HistoryPanel
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         triggerRef={historyButtonRef}
       />
+      <Outlet context={attachments} />
     </div>
   );
 }
@@ -153,7 +163,7 @@ function Sidebar({
 }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ring-1 ring-slate-200/70 backdrop-blur-md md:relative md:inset-auto md:h-full md:w-16 md:flex-col md:justify-between md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none dark:bg-slate-900/70 dark:ring-slate-700/60 md:dark:bg-transparent"
+      className="fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] z-20 flex items-center justify-around bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ring-1 ring-slate-200/70 backdrop-blur-md md:relative md:inset-auto md:h-full md:w-16 md:flex-col md:justify-between md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none dark:bg-slate-900/70 dark:ring-slate-700/60 md:dark:bg-transparent"
     >
       <div className="flex items-center gap-1 md:flex-col md:gap-2">
         <RailButton label="New chat" onClick={onNewChat}>
@@ -180,7 +190,7 @@ function Sidebar({
         <button
           type="button"
           aria-label="Profile"
-          className="flex size-10 items-center justify-center rounded-full transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 md:size-9"
+          className="flex size-10 items-center justify-center rounded-full transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11"
         >
           <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white">
             {USER_NAME.charAt(0)}
