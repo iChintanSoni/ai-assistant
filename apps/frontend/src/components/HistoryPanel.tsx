@@ -88,7 +88,9 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
       setQuery("");
       setConfirmingId(null);
       setLoadError(null);
-      searchRef.current?.focus();
+      // Not on touch: focusing here raises the soft keyboard before the user has
+      // seen the sheet, and shrinks it to a couple of rows.
+      if (!window.matchMedia?.("(pointer: coarse)").matches) searchRef.current?.focus();
     }
   }, [open]);
 
@@ -162,7 +164,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
       // bar — at 375px it ran 25px off-screen. Below md: it becomes a bottom sheet;
       // the dismissal contract (Escape, outside click, focus back to the trigger)
       // is unchanged, only the shape is.
-      className="fixed inset-x-0 bottom-0 z-30 flex max-h-[70dvh] flex-col gap-2 rounded-t-3xl bg-white/80 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ring-1 ring-slate-200/70 backdrop-blur-md md:inset-x-auto md:top-6 md:bottom-auto md:max-h-[70vh] md:w-80 md:rounded-3xl md:pb-3 md:left-20 dark:bg-slate-900/80 dark:ring-slate-700/60"
+      className="fixed inset-x-0 bottom-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] z-30 flex max-h-[60dvh] flex-col gap-2 rounded-t-3xl bg-white/80 p-3 ring-1 ring-slate-200/70 backdrop-blur-md md:inset-x-auto md:top-6 md:bottom-auto md:max-h-[70vh] md:w-80 md:rounded-3xl md:left-20 dark:bg-slate-900/80 dark:ring-slate-700/60"
     >
       <div className="flex items-center justify-between px-1">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-200">History</span>

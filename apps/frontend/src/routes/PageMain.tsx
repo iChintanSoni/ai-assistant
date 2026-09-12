@@ -11,6 +11,7 @@ import type { ComponentProps } from "react";
 export function PageMain({ children, ...rest }: ComponentProps<"main">) {
   return (
     <main
+      id="main"
       tabIndex={-1}
       className="relative z-10 flex flex-1 flex-col overflow-hidden px-4 pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 md:px-6 md:pb-0"
       {...rest}

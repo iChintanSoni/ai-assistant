@@ -36,11 +36,12 @@ mental model and you end up maintaining two designs instead of one that grows.
 ```tsx
 <div className="relative flex h-dvh w-full flex-col overflow-hidden md:flex-row">
   <AuroraGlow />
-  <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-4
+  <SkipLink />   {/* sr-only focus:not-sr-only, href="#main" */}
+  <Nav />        {/* fixed bottom bar on phones, w-16 rail from md: up */}
+  <main id="main" className="relative z-10 flex flex-1 flex-col overflow-hidden px-4
                    pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] md:px-6 md:pb-0">
     {/* focal content */}
   </main>
-  <Nav />   {/* bottom bar on phones; md:order-first puts the rail back on the left */}
 </div>
 ```
 
@@ -48,10 +49,13 @@ mental model and you end up maintaining two designs instead of one that grows.
   viewport, so with the browser toolbar showing, the bottom of the layout sits
   below the fold — which is exactly where the composer lives. `dvh` tracks the
   toolbar. On desktop the two are identical.
-- **`main` comes first in the DOM, the nav second.** On a phone the bar is visually
-  last, so document order and tab order agree; `md:order-first` on the nav restores
-  the rail to the left visually without moving it back ahead of the content in the
-  tab sequence. See [accessibility.md](accessibility.md).
+- **The nav stays first in the DOM, with a skip link past it.** It's a landmark and
+  it's visually first on desktop, so that's the order that matches. Reordering with
+  `order-*` for the phone lane fixes one lane by breaking the other — it would leave
+  the desktop rail painting first while reading last, which is exactly the
+  visual-vs-focus mismatch [accessibility.md](accessibility.md) forbids. A
+  `sr-only focus:not-sr-only` "Skip to content" link is what keeps a phone user from
+  tabbing the whole bar before the composer.
 - `flex-col md:flex-row` doesn't position the bar — the bar is `fixed`, so it's out
   of flow entirely. What the direction actually buys is that `main` takes the full
   width once the rail is hidden.
@@ -94,6 +98,11 @@ viewport is too much to spend on chrome.
   buttons sit inside the home-indicator strip, where taps become system swipes.
   The `max()` wrapper is there so the bar still has breathing room on devices with
   genuinely no inset — it is not a substitute for the meta tag.
+- **`viewport-fit=cover` opts in on every axis, not just the bottom.** A notched
+  phone in landscape is wide enough for `md:`, where the rail is `w-16 px-0` and
+  `main` is `px-6` — both narrower than the ~44px left/right inset, so controls end
+  up under the notch. Pad the shell horizontally as well:
+  `pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]`.
 - The bar is the one place a translucent surface spans the full width; it uses the
   standard recipe (`bg-white/70` + `backdrop-blur-md` + hairline ring), so it still
   reads as glass over the glow rather than as chrome.
@@ -165,12 +174,14 @@ composer, and `100vh`/`h-screen` layouts don't notice.
   layout viewport — and therefore `dvh` — stays put. On an `overflow-hidden` shell
   that means the composer is covered and cannot even be scrolled to. This is the
   trap; `h-dvh` solves the browser-toolbar problem, not this one.
-- **The fix is `interactive-widget=resizes-content`** in the viewport meta (see the
-  tag above), which makes the layout viewport — and `dvh` — shrink with the
-  keyboard, so the existing layout just works.
-- Where that isn't enough (older Safari), listen to `window.visualViewport`'s
-  `resize` and offset the composer by `innerHeight - visualViewport.height`. Detach
-  on unmount; `visualViewport` can be undefined, so feature-detect.
+- **`interactive-widget=resizes-content`** in the viewport meta makes the layout
+  viewport — and `dvh` — shrink with the keyboard, so the existing layout just
+  works. **It is Chromium-only.**
+- **iOS Safari therefore still needs the `visualViewport` fallback**, which is not
+  optional there: measure `innerHeight - visualViewport.height - offsetTop` and pad
+  the shell by it. Listen to both `resize` and `scroll` (iOS scrolls the visual
+  viewport to reveal the caret), feature-detect `visualViewport`, and detach on
+  unmount. `hooks/useKeyboardInset.ts` is the implementation.
 - Never auto-focus the textarea on mount on a phone — it summons the keyboard
   before the user has seen the screen.
 

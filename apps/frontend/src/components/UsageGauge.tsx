@@ -92,7 +92,7 @@ export function UsageGauge() {
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-500 dark:hover:bg-slate-800"
+        className="pointer-coarse:size-11 flex size-10 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-500 dark:hover:bg-slate-800"
       >
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
           <circle

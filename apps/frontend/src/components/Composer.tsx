@@ -1,6 +1,6 @@
 /** The prompt pill: modality-gated attach, multiline input, model selector, record/stop. */
 import { useLayoutEffect, useRef, useState } from "react";
-import { MicrophoneIcon, PlusIcon, StopIcon } from "@heroicons/react/24/outline";
+import { ArrowUpIcon, MicrophoneIcon, PlusIcon, StopIcon } from "@heroicons/react/24/outline";
 import { ModelSelector } from "./ModelSelector";
 import { UsageGauge } from "./UsageGauge";
 import { ChatFiles } from "./ChatFiles";
@@ -40,8 +40,18 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
   useLayoutEffect(() => {
     const element = textArea.current;
     if (!element) return;
-    element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
+    function resize() {
+      if (!element) return;
+      element.style.height = "auto";
+      element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
+    }
+    resize();
+    // The textarea's vertical padding is breakpoint-dependent (py-2.5 -> md:py-0)
+    // and scrollHeight includes it under border-box, so a cached height goes stale
+    // when the viewport crosses md: — rotating a phone would otherwise leave the
+    // draft clipped to a few pixels until the next keystroke.
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
   }, [text]);
 
   async function submit() {
@@ -109,7 +119,10 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            // Only a keyboard with a real Shift+Enter gets Enter-to-send; on a soft
+            // keyboard Enter has to stay a newline, and Send is the button.
+            const softKeyboard = window.matchMedia?.("(pointer: coarse)").matches;
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !softKeyboard) {
               e.preventDefault();
               void submit();
             }
@@ -123,10 +136,8 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           }`}
         />
 
-        {/* Secondary readout — the first thing to go when width is scarce, same
-            precedent as the model selector hiding its label below sm. */}
         <div
-          className={`col-start-2 hidden justify-self-end sm:block md:col-start-3 md:justify-self-auto ${
+          className={`col-start-2 justify-self-end md:col-start-3 md:justify-self-auto ${
             hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
           }`}
         >
@@ -140,6 +151,9 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           <ModelSelector />
         </div>
 
+        {/* With text pending, the trailing control becomes Send. A soft keyboard has
+            no Shift+Enter, so Enter has to insert a newline there — which leaves no
+            way to send at all without this button. */}
         {isStreaming ? (
           <button
             type="button"
@@ -150,6 +164,18 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
             }`}
           >
             <StopIcon className="size-5" aria-hidden="true" />
+          </button>
+        ) : text.trim() ? (
+          <button
+            type="button"
+            aria-label="Send"
+            onClick={() => void submit()}
+            disabled={isSending}
+            className={`col-start-4 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 pointer-coarse:size-11 md:col-start-5 dark:bg-slate-700 dark:hover:bg-slate-600 ${
+              hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
+            }`}
+          >
+            <ArrowUpIcon className="size-5" aria-hidden="true" />
           </button>
         ) : (
           <button

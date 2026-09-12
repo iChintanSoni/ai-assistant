@@ -83,10 +83,11 @@ motion alone.
 - The **segmented control** (Appearance, or any future tri-state choice) uses
   `role="radiogroup"`/`role="radio"` with roving `tabIndex` and Left/Right
   arrow-key navigation between segments — see [components.md](components.md).
-- Maintain a logical DOM/tab order. On desktop the rail reads first and sits first;
-  on a phone the nav is a **bottom** bar, so `main` comes first in the DOM and the
-  nav uses `md:order-first` to return to the left visually without jumping ahead of
-  the content in the tab sequence. Don't reorder visually in a way
+- Maintain a logical DOM/tab order: nav → main, at every width. On a phone the nav
+  is a **bottom** bar, so it reads before content it sits below — the fix is a
+  `sr-only focus:not-sr-only` **skip link**, not `order-*`. Reordering would only
+  move the mismatch to desktop, where the rail would paint first and read last.
+  Don't reorder visually in a way
   that fights the tab sequence.
 
 ## Tap targets

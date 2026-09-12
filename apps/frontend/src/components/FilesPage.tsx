@@ -155,7 +155,7 @@ export function FilesPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex min-w-56 flex-1 items-center gap-2 rounded-full bg-white/70 px-3 py-2 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-white/70 px-3 py-2 sm:min-w-56 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
               <MagnifyingGlassIcon className="size-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
               <input
                 type="text"

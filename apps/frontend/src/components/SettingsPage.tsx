@@ -203,8 +203,8 @@ export function SettingsPage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-3 px-1 pb-10">
           <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase dark:text-slate-500">Models</h2>
 
-          <form onSubmit={(e) => void handleDownload(e)} className="flex items-center gap-2">
-            <div className="flex min-w-56 flex-1 items-center gap-2 rounded-full bg-white/70 px-4 py-2.5 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
+          <form onSubmit={(e) => void handleDownload(e)} className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-white/70 px-4 py-2.5 sm:min-w-56 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
               <input
                 type="text"
                 value={downloadName}
