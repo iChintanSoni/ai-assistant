@@ -44,7 +44,7 @@ function IconButton({ label, children }: { label: string; children: React.ReactN
     <button
       type="button"
       aria-label={label}
-      className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+      className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 pointer-coarse:size-11 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
     >
       {children}
     </button>
@@ -53,7 +53,8 @@ function IconButton({ label, children }: { label: string; children: React.ReactN
 ```
 
 The rail's `RailButton` is the same recipe (add `group` if you need hover-driven
-children). Requirements: `size-10` hit target, `aria-label`, visible focus ring,
+children). Requirements: `size-10` hit target, `pointer-coarse:size-11` on touch,
+`aria-label`, visible focus ring,
 `hover:bg-slate-100` soft fill. Icon-only buttons **must** have `aria-label`.
 
 ## Model / version selector (dropdown pill)

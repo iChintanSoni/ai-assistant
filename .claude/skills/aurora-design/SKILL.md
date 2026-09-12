@@ -5,10 +5,12 @@ description: >-
   Tailwind v4). Use whenever building, editing, styling, or reviewing ANY UI —
   pages, components, layouts, colors, spacing, typography, icons, or animation.
   Covers the signature aurora-glow background, the full-viewport minimalist
-  layout, pill inputs, thin-line SVG icons, motion, design tokens, and
-  accessibility. Load the relevant reference file before writing UI code.
+  layout, pill inputs, thin-line SVG icons, motion, design tokens, responsive
+  (mobile-first) behaviour, and accessibility. Load the relevant reference file
+  before writing UI code.
   Triggers: UI, frontend, component, page, layout, screen, style, CSS, Tailwind,
-  glow, aurora, aura, gradient, design, theme, spacing, color, icon, animation.
+  glow, aurora, aura, gradient, design, theme, spacing, color, icon, animation,
+  responsive, mobile, phone, breakpoint, viewport, touch.
 ---
 
 # Aurora Design System
@@ -27,26 +29,28 @@ Load this skill for **any** frontend/UI task in this repo. It is the source of
 truth for how things should look and how they are built. Match the existing
 tokens and patterns instead of inventing new ones.
 
-## The 8 principles (memorize these)
+## The 9 principles (memorize these)
 
-1. **Airy first.** Massive negative space. When unsure, add more space, not more UI.
-2. **One focal point per screen.** Center the primary interaction; let everything else recede.
-3. **Glow, not chrome.** Depth = a blurred pastel aurora, not shadows/borders.
-4. **Soft surfaces.** Translucent whites (`bg-white/70`) + `backdrop-blur`, hairline `ring-1` at low opacity — never opaque cards.
-5. **Ultra-rounded.** Primary surfaces and controls are `rounded-full`. Nothing sharp.
-6. **Thin-line iconography.** 1.5px stroke, `currentColor`, geometric. Never filled/heavy icons.
-7. **Restrained palette.** Slate neutrals + a blue→indigo accent. Color is an accent, not a fill.
-8. **Alive but calm.** Slow, subtle motion (glow drift). Always honor `prefers-reduced-motion`.
+1. **Phone first.** Design the base case at 375px, then add breakpoints upward. The
+   full-viewport desktop layout is the enhancement, not the starting point.
+2. **Airy first.** Massive negative space. When unsure, add more space, not more UI.
+3. **One focal point per screen.** Center the primary interaction; let everything else recede.
+4. **Glow, not chrome.** Depth = a blurred pastel aurora, not shadows/borders.
+5. **Soft surfaces.** Translucent whites (`bg-white/70`) + `backdrop-blur`, hairline `ring-1` at low opacity — never opaque cards.
+6. **Ultra-rounded.** Primary surfaces and controls are `rounded-full`. Nothing sharp.
+7. **Thin-line iconography.** 1.5px stroke, `currentColor`, geometric. Never filled/heavy icons.
+8. **Restrained palette.** Slate neutrals + a blue→indigo accent. Color is an accent, not a fill.
+9. **Alive but calm.** Slow, subtle motion (glow drift). Always honor `prefers-reduced-motion`.
 
 ## Quick start
 
 ```tsx
-<div className="relative flex h-screen w-screen overflow-hidden bg-white font-sans text-slate-800 antialiased">
+<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-slate-800 antialiased md:flex-row">
   <AuroraGlow />   {/* decorative, aria-hidden, pointer-events-none */}
-  <Sidebar />      {/* thin w-16 rail, avatar pinned bottom */}
-  <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6">
+  <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] md:px-6 md:pb-0">
     {/* one centered focal interaction */}
   </main>
+  <Nav />          {/* bottom bar on phones, md:order-first rail above */}
 </div>
 ```
 
@@ -59,6 +63,7 @@ Full, runnable reference: [examples/HomePage.tsx](examples/HomePage.tsx) +
 | --- | --- |
 | Setting up Tailwind, fixing "styles not applying", or a new build | [references/setup.md](references/setup.md) |
 | Choosing colors, spacing, radius, blur, opacity, or type | [references/tokens.md](references/tokens.md) |
+| Laying out for phones, or touching the shell/nav | [references/responsive.md](references/responsive.md) |
 | Adding/tuning the background glow | [references/glow.md](references/glow.md) |
 | Building page shells, sidebars, or centering a hub | [references/layout.md](references/layout.md) |
 | Building pills, inputs, buttons, selectors, avatars | [references/components.md](references/components.md) |
@@ -78,6 +83,9 @@ Full, runnable reference: [examples/HomePage.tsx](examples/HomePage.tsx) +
 - [ ] Any animation is wrapped by the `prefers-reduced-motion` guard.
 - [ ] Accent stays blue→indigo (`from-blue-500 to-indigo-500`); neutrals stay `slate-*`.
 - [ ] Every hardcoded light token has a `dark:` companion — see [references/dark-mode.md](references/dark-mode.md).
+- [ ] Designed at phone width first; verified at **375×812 and 1440×900**, light and dark.
+- [ ] Touch targets ≥ 44px with a coarse pointer (`size-10 pointer-coarse:size-11`).
+- [ ] The shell uses `h-dvh`, not `h-screen`, and nothing scrolls sideways at 375px.
 
 ## External references
 

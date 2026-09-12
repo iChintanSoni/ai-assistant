@@ -80,15 +80,33 @@ arbitrary values like `/37`.
 
 ## Spacing rhythm
 
-- Page gutters: `px-6`.
+- Page gutters: `px-4` on phones, `md:px-6`.
 - Greeting → input gap: `mb-10`.
 - Intra-pill gaps: `gap-3` (major), `gap-1.5` (tight, e.g. selector internals).
 - Rail vertical padding: `py-6`; rail item gap: `gap-2`.
-- Hit targets: `size-10` (rail/pill actions), `size-9` (avatar). Never below
-  40px for primary tap targets — see [accessibility.md](accessibility.md).
+- Hit targets: `size-10` (40px) by default, `pointer-coarse:size-11` (44px) where
+  the pointer is imprecise. Keyed on the pointer, not the viewport width — see
+  [accessibility.md](accessibility.md), which also covers how a visually smaller
+  control (the `size-9` avatar) pads its hit area to reach the floor.
+
+## Breakpoints
+
+Min-width only, and the base case is a phone — see
+[responsive.md](responsive.md). Never use `max-*` variants.
+
+| Prefix | Width | Meaning |
+| --- | --- | --- |
+| *(none)* | phone | The base case; write it first. |
+| `sm:` | 640 | Secondary labels and the usage gauge return. |
+| `md:` | 768 | The left rail returns, the bottom bar retires, the composer collapses to one row. |
+| `lg:` | 1024 | Wider grids. |
 
 ## Layout constants
 
-- Sidebar width: `w-16`.
+- Sidebar width: `w-16` (`md:` and up).
+- Bottom bar: full width, `md:hidden`, padded with
+  `pb-[max(0.5rem,env(safe-area-inset-bottom))]`.
 - Prompt hub max width: `max-w-2xl`.
-- Root: `h-screen w-screen overflow-hidden` (non-scrolling single screen).
+- Page gutters: `px-4` on phones, `md:px-6`.
+- Root: `h-dvh w-full overflow-hidden` (non-scrolling single shell). `dvh`, not
+  `vh` — mobile toolbars change the viewport and `vh` measures the largest.

@@ -83,13 +83,36 @@ motion alone.
 - The **segmented control** (Appearance, or any future tri-state choice) uses
   `role="radiogroup"`/`role="radio"` with roving `tabIndex` and Left/Right
   arrow-key navigation between segments — see [components.md](components.md).
-- Maintain a logical DOM/tab order: rail → main. Don't reorder visually in a way
+- Maintain a logical DOM/tab order. On desktop the rail reads first and sits first;
+  on a phone the nav is a **bottom** bar, so `main` comes first in the DOM and the
+  nav uses `md:order-first` to return to the left visually without jumping ahead of
+  the content in the tab sequence. Don't reorder visually in a way
   that fights the tab sequence.
 
 ## Tap targets
 
-Primary interactive targets are `size-10` (40px) — the practical minimum for
-touch. Don't shrink icon buttons below that. The avatar at `size-9` (36px) is a
+Primary interactive targets are `size-10` (40px) with a precise pointer and
+**`pointer-coarse:size-11` (44px) with an imprecise one** — the practical minimum,
+and the figure both Apple's HIG and Material use. (WCAG 2.2's 24px AA minimum is a
+floor to clear, not a target to aim at.)
+
+```tsx
+<button className="size-10 pointer-coarse:size-11" />
+```
+
+Key it on the **pointer, not the breakpoint**: `md:` calls an iPad in portrait
+(768px, touch-only) a desktop and a narrowed desktop window (700px, mouse) a phone.
+
+Never go below 40px in either mode. A control that must *look* smaller can still
+meet the floor by padding its hit area rather than its visual box — wrap it:
+
+```tsx
+<button aria-label="Profile" className="flex size-10 items-center justify-center rounded-full pointer-coarse:size-11">
+  <span className="size-9 rounded-full bg-linear-to-br from-blue-500 to-indigo-500" />
+</button>
+```
+
+The avatar at `size-9` (36px) is a
 borderline exception; enlarge if it becomes a primary action.
 
 ## Quick audit checklist
@@ -100,6 +123,6 @@ borderline exception; enlarge if it becomes a primary action.
 - [ ] Text contrast ≥ AA (placeholders excepted, and only for hints).
 - [ ] Reduced-motion guard present.
 - [ ] Native elements + sensible tab order; custom menus fully keyboard-operable.
-- [ ] Tap targets ≥ 40px for primary actions.
+- [ ] Tap targets ≥ 40px, and ≥ 44px under `pointer-coarse:`, for primary actions.
 
 For deeper audits, use the `chrome-devtools-mcp:a11y-debugging` skill.
