@@ -12,10 +12,11 @@ bottom-bar lane that the rail replaces at `md:`.
 ```tsx
 <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-slate-800 antialiased md:flex-row">
   <AuroraGlow />   {/* paints first, behind everything */}
-  <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] md:px-6 md:pb-0">
+  <SkipLink />     {/* sr-only focus:not-sr-only, href="#main" */}
+  <Nav />          {/* z-20; bottom bar on phones, w-16 rail from md: up */}
+  <main id="main" className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] md:px-6 md:pb-0">
     {/* focal content */}
   </main>
-  <Nav />          {/* z-20; bottom bar on phones, md:order-first rail above */}
 </div>
 ```
 
@@ -23,10 +24,10 @@ bottom-bar lane that the rail replaces at `md:`.
 - `flex flex-col md:flex-row` — on desktop the rail sits beside the content. On a
   phone the bar is `fixed` and therefore out of flow, so the direction only matters
   in that `main` takes the full width once the rail is hidden.
-- **`main` is first in the DOM and reserves the bar's height** with
+- **`main` reserves the bar's height** with
   `pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))]` — a fixed bar can't
-  push content, and nav-before-main would put the whole nav ahead of the composer
-  in the tab order on a phone.
+  push content. The nav keeps its place first in the DOM; a skip link is what stops
+  that costing phone users a walk through the whole bar.
 - `h-dvh w-full overflow-hidden` — exactly one screen, never scrolls. `dvh` rather
   than `vh` because mobile browser toolbars change the viewport height, and `vh`
   measures the largest one — putting the composer below the fold. `h-dvh` is
@@ -48,7 +49,7 @@ Thin, floating, iconographic. Top navigation group; profile avatar pinned to the
 bottom via `justify-between`.
 
 ```tsx
-<nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ring-1 ring-slate-200/70 backdrop-blur-md md:relative md:inset-auto md:order-first md:h-full md:w-16 md:flex-col md:justify-between md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none">
+<nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ring-1 ring-slate-200/70 backdrop-blur-md md:relative md:inset-auto md:h-full md:w-16 md:flex-col md:justify-between md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none">
   <div className="flex flex-col items-center gap-2">
     <RailButton label="New chat"><PlusIcon /></RailButton>
     <RailButton label="History"><HistoryIcon /></RailButton>

@@ -203,7 +203,7 @@ export function SettingsPage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-3 px-1 pb-10">
           <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase dark:text-slate-500">Models</h2>
 
-          <form onSubmit={(e) => void handleDownload(e)} className="flex items-center gap-2">
+          <form onSubmit={(e) => void handleDownload(e)} className="flex flex-wrap items-center gap-2">
             <div className="flex min-w-56 flex-1 items-center gap-2 rounded-full bg-white/70 px-4 py-2.5 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
               <input
                 type="text"
@@ -212,13 +212,13 @@ export function SettingsPage() {
                 placeholder="e.g. llama3.1:8b"
                 aria-label="Model name to download"
                 disabled={pull !== null}
-                className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden disabled:opacity-50 pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
             </div>
             <button
               type="submit"
               disabled={!downloadName.trim() || pull !== null}
-              className="flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100/80 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-50 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80"
+              className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-slate-100/80 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-50 pointer-coarse:min-h-11 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80"
             >
               <ArrowDownTrayIcon className="size-4" aria-hidden="true" />
               Download
@@ -228,7 +228,7 @@ export function SettingsPage() {
           {pull && <PullProgressRow pull={pull} />}
           {actionError && <p className="px-2 py-1 text-sm text-rose-500 dark:text-rose-400">{actionError}</p>}
 
-          <div className="flex min-w-56 items-center gap-2 rounded-full bg-white/70 px-3 py-2 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
+          <div className="flex min-w-56 flex-1 items-center gap-2 rounded-full bg-white/70 px-3 py-2 ring-1 ring-slate-200/70 backdrop-blur-md focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60">
             <MagnifyingGlassIcon className="size-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
             <input
               type="text"
@@ -236,7 +236,7 @@ export function SettingsPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search models..."
               aria-label="Search models"
-              className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder:text-slate-500"
+              className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
 
@@ -436,12 +436,12 @@ function ModelRow({
             aria-pressed={defaultAction.isDefault}
             disabled={defaultAction.isDefault}
             onClick={defaultAction.onSet}
-            className={`flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 ${
               defaultAction.isDefault
                 ? "text-blue-500 dark:text-blue-400"
                 : defaultConfirming
                   ? "bg-rose-100 text-rose-600 opacity-100 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
-                  : "text-slate-300 opacity-0 hover:bg-slate-200 hover:text-slate-600 group-hover:opacity-100 focus-visible:opacity-100 dark:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                  : "text-slate-300 opacity-0 hover:bg-slate-200 hover:text-slate-600 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100 dark:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
             }`}
           >
             <defaultAction.icon className="size-4" aria-hidden="true" />
@@ -451,7 +451,7 @@ function ModelRow({
           type="button"
           aria-label={deleteConfirming ? `Confirm delete "${model.name}"` : `Delete "${model.name}"`}
           onClick={onDelete}
-          className={`mr-1 flex size-8 shrink-0 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+          className={`mr-1 flex size-10 shrink-0 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 pointer-coarse:opacity-100 ${
             deleteConfirming
               ? "bg-rose-100 text-rose-600 opacity-100 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
               : "text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
@@ -512,7 +512,7 @@ function AppearanceControl() {
             aria-checked={checked}
             tabIndex={checked ? 0 : -1}
             onClick={() => setPreference(value)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 px-4 text-sm font-medium transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+            className={`flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 px-4 text-sm font-medium transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:min-h-11 ${
               checked
                 ? "bg-white text-slate-900 dark:bg-slate-700 dark:text-slate-100"
                 : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"

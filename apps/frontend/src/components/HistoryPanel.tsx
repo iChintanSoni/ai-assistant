@@ -8,6 +8,7 @@ import {
   listConversations,
   type ConversationSummary,
 } from "../lib/history";
+import { isCoarsePointer } from "../lib/pointer";
 import { useChatStore } from "../store/chat";
 
 const GROUP_ORDER = ["Today", "Yesterday", "Previous 7 days", "Older"] as const;
@@ -88,7 +89,9 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
       setQuery("");
       setConfirmingId(null);
       setLoadError(null);
-      searchRef.current?.focus();
+      // Not on touch: focusing here raises the soft keyboard before the user has
+      // seen the sheet, and shrinks it to a couple of rows.
+      if (!isCoarsePointer()) searchRef.current?.focus();
     }
   }, [open]);
 
@@ -158,7 +161,11 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
       ref={panelRef}
       role="dialog"
       aria-label="Conversation history"
-      className="fixed top-6 left-20 z-30 flex max-h-[70vh] w-80 flex-col gap-2 rounded-3xl bg-white/80 p-3 ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/80 dark:ring-slate-700/60"
+      // A flyout anchored to the rail has nowhere to go once the rail is a bottom
+      // bar — at 375px it ran 25px off-screen. Below md: it becomes a bottom sheet;
+      // the dismissal contract (Escape, outside click, focus back to the trigger)
+      // is unchanged, only the shape is.
+      className="fixed inset-x-0 bottom-[calc(var(--keyboard-inset,0px)+var(--nav-h))] z-30 flex max-h-[60dvh] flex-col gap-2 rounded-t-3xl bg-white/80 p-3 ring-1 ring-slate-200/70 backdrop-blur-md md:inset-x-auto md:top-6 md:bottom-auto md:max-h-[70vh] md:w-80 md:rounded-3xl md:left-20 dark:bg-slate-900/80 dark:ring-slate-700/60"
     >
       <div className="flex items-center justify-between px-1">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-200">History</span>
@@ -166,7 +173,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
           type="button"
           aria-label="Close history"
           onClick={close}
-          className="flex size-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          className="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
         >
           <XMarkIcon className="size-4" aria-hidden="true" />
         </button>
@@ -181,7 +188,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search conversations..."
           aria-label="Search conversations"
-          className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="min-h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 focus:outline-hidden pointer-coarse:min-h-11 dark:text-slate-100 dark:placeholder:text-slate-500"
         />
       </div>
 
@@ -205,7 +212,7 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
                 <button
                   type="button"
                   onClick={() => void openConversation(item.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl px-2 py-2 text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                  className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl px-2 py-2 text-left focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:min-h-11"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">
                     {item.title}
@@ -218,7 +225,11 @@ export function HistoryPanel({ open, onClose, triggerRef }: HistoryPanelProps) {
                   type="button"
                   aria-label={confirmingId === item.id ? `Confirm delete "${item.title}"` : `Delete "${item.title}"`}
                   onClick={() => void handleDelete(item.id)}
-                  className={`mr-1 flex size-8 shrink-0 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+                  // Revealed on hover with a fine pointer, but always visible under
+                  // pointer-coarse: — a touch device never hovers, so this was
+                  // permanently invisible on a phone and deleting a conversation
+                  // was impossible.
+                  className={`mr-1 flex size-10 shrink-0 items-center justify-center rounded-full opacity-0 transition-colors group-hover:opacity-100 focus-visible:opacity-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 pointer-coarse:opacity-100 ${
                     confirmingId === item.id
                       ? "bg-rose-100 text-rose-600 opacity-100 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
                       : "text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"

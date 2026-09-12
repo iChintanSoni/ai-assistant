@@ -52,9 +52,12 @@ export function ModelSelector() {
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
+        // The label is `hidden sm:inline`, so below sm: this is an icon-only button
+        // and the visible text can't be its accessible name.
+        aria-label={selected ? `Model: ${selected}` : "No models"}
         disabled={models.length === 0}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pr-2 pl-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-50 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80"
+        className="flex min-h-10 items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pr-2 pl-3 text-sm font-medium text-slate-600 pointer-coarse:min-h-11 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-50 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80"
       >
         <SparklesIcon className="size-4 text-blue-500 dark:text-blue-400" />
         <span className="hidden max-w-[9rem] truncate sm:inline">{selected ?? "No models"}</span>
@@ -65,7 +68,7 @@ export function ModelSelector() {
         <ul
           role="listbox"
           aria-label="Select model"
-          className="absolute right-0 bottom-full z-30 mb-2 max-h-80 w-72 overflow-auto rounded-2xl bg-white/95 p-1.5 ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/95 dark:ring-slate-700/60"
+          className="absolute right-0 bottom-full z-30 mb-2 max-h-[60dvh] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl bg-white/95 p-1.5 ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/95 dark:ring-slate-700/60"
         >
           {models.map((m) => {
             const isSelected = m.name === selected;

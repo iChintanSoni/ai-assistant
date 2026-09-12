@@ -36,11 +36,12 @@ mental model and you end up maintaining two designs instead of one that grows.
 ```tsx
 <div className="relative flex h-dvh w-full flex-col overflow-hidden md:flex-row">
   <AuroraGlow />
-  <main className="relative z-10 flex flex-1 flex-col overflow-hidden px-4
+  <SkipLink />   {/* sr-only focus:not-sr-only, href="#main" */}
+  <Nav />        {/* fixed bottom bar on phones, w-16 rail from md: up */}
+  <main id="main" className="relative z-10 flex flex-1 flex-col overflow-hidden px-4
                    pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] md:px-6 md:pb-0">
     {/* focal content */}
   </main>
-  <Nav />   {/* bottom bar on phones; md:order-first puts the rail back on the left */}
 </div>
 ```
 
@@ -48,17 +49,22 @@ mental model and you end up maintaining two designs instead of one that grows.
   viewport, so with the browser toolbar showing, the bottom of the layout sits
   below the fold — which is exactly where the composer lives. `dvh` tracks the
   toolbar. On desktop the two are identical.
-- **`main` comes first in the DOM, the nav second.** On a phone the bar is visually
-  last, so document order and tab order agree; `md:order-first` on the nav restores
-  the rail to the left visually without moving it back ahead of the content in the
-  tab sequence. See [accessibility.md](accessibility.md).
+- **The nav stays first in the DOM, with a skip link past it.** It's a landmark and
+  it's visually first on desktop, so that's the order that matches. Reordering with
+  `order-*` for the phone lane fixes one lane by breaking the other — it would leave
+  the desktop rail painting first while reading last, which is exactly the
+  visual-vs-focus mismatch [accessibility.md](accessibility.md) forbids. A
+  `sr-only focus:not-sr-only` "Skip to content" link is what keeps a phone user from
+  tabbing the whole bar before the composer.
 - `flex-col md:flex-row` doesn't position the bar — the bar is `fixed`, so it's out
   of flow entirely. What the direction actually buys is that `main` takes the full
   width once the rail is hidden.
 - **`main` must reserve the bar's height**, because a fixed bar cannot push content.
-  Derive it rather than guessing: the bar is `pt-2` + `size-11` + its safe-area
-  padding, i.e. `calc(3.25rem + max(0.5rem, env(safe-area-inset-bottom)))`. A magic
-  `pb-20` is wrong in both directions and drifts the moment the bar changes.
+  Define it once — this app keeps it as `--nav-h` in `index.css`
+  (`calc(3.25rem + max(0.5rem, env(safe-area-inset-bottom)))`: the bar's `pt-2` plus
+  a 44px target) and references it as `pb-[var(--nav-h)]`. Retyping the expression
+  at each call site drifts the moment the bar changes; a magic `pb-20` is wrong in
+  both directions from the start.
 - The **shell** still never scrolls. A *focal pane* may scroll inside it — that's
   the one relaxation of the single-screen rule, and it's what makes a long
   transcript or a file grid usable on a phone.
@@ -71,16 +77,17 @@ Bottom-anchored because that's where thumbs are, and because 64px of a 375px
 viewport is too much to spend on chrome.
 
 ```tsx
-{/* Phones */}
+{/* One <nav>, two lanes. Not two components: jsdom never loads the stylesheet, so
+    a second `md:hidden` nav would duplicate every button for tests and make each
+    getByRole ambiguous. */}
 <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around
                 bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]
                 ring-1 ring-slate-200/70 backdrop-blur-md
-                md:hidden dark:bg-slate-900/70 dark:ring-slate-700/60">
-  …RailButtons…
+                md:relative md:inset-auto md:h-full md:w-16 md:flex-col md:justify-between
+                md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none">
+  <div className="flex items-center gap-1 md:flex-col md:gap-2">…</div>
+  <div className="flex items-center gap-1 md:flex-col md:gap-2">…</div>
 </nav>
-
-{/* md: and up — unchanged from layout.md */}
-<nav className="relative z-20 hidden h-full w-16 flex-col items-center justify-between py-6 md:flex">
 ```
 
 - **`env(safe-area-inset-*)` is 0 unless the page opts in.** It only reports a real
@@ -94,6 +101,11 @@ viewport is too much to spend on chrome.
   buttons sit inside the home-indicator strip, where taps become system swipes.
   The `max()` wrapper is there so the bar still has breathing room on devices with
   genuinely no inset — it is not a substitute for the meta tag.
+- **`viewport-fit=cover` opts in on every axis, not just the bottom.** A notched
+  phone in landscape is wide enough for `md:`, where the rail is `w-16 px-0` and
+  `main` is `px-6` — both narrower than the ~44px left/right inset, so controls end
+  up under the notch. Pad the shell horizontally as well:
+  `pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]`.
 - The bar is the one place a translucent surface spans the full width; it uses the
   standard recipe (`bg-white/70` + `backdrop-blur-md` + hairline ring), so it still
   reads as glass over the glow rather than as chrome.
@@ -145,9 +157,12 @@ One row at 375px gives the textarea 37px. Stack it instead:
 - The textarea needs **`col-span-full`** on the phone row — without it, auto-flow
   drops it into a single 1fr cell beside the controls and you are back to a ~37px
   input. `md:col-span-1` resets it when the pill collapses to one row.
-- The phone grid has **four** columns (attach · flexible · model · send) and the
-  `md:` grid has five (the usage gauge rejoins). Column starts are therefore
+- The phone grid has **five** columns (attach · flexible · model · mic · send) and
+  the `md:` grid has six (the usage gauge rejoins). Column starts are therefore
   breakpoint-specific — count them when adding a control.
+- Send and the mic coexist rather than sharing a slot: voice input appends to an
+  existing draft, so swapping the mic out for Send would make dictation reachable
+  only from an empty composer.
 - `py-2.5` on the textarea is what lifts it to the 44px touch floor; the
   auto-resize reads `scrollHeight`, which includes padding under `border-box`.
 - The `UsageGauge` is `hidden sm:flex` — it's a secondary readout, and the model
@@ -165,12 +180,14 @@ composer, and `100vh`/`h-screen` layouts don't notice.
   layout viewport — and therefore `dvh` — stays put. On an `overflow-hidden` shell
   that means the composer is covered and cannot even be scrolled to. This is the
   trap; `h-dvh` solves the browser-toolbar problem, not this one.
-- **The fix is `interactive-widget=resizes-content`** in the viewport meta (see the
-  tag above), which makes the layout viewport — and `dvh` — shrink with the
-  keyboard, so the existing layout just works.
-- Where that isn't enough (older Safari), listen to `window.visualViewport`'s
-  `resize` and offset the composer by `innerHeight - visualViewport.height`. Detach
-  on unmount; `visualViewport` can be undefined, so feature-detect.
+- **`interactive-widget=resizes-content`** in the viewport meta makes the layout
+  viewport — and `dvh` — shrink with the keyboard, so the existing layout just
+  works. **It is Chromium-only.**
+- **iOS Safari therefore still needs the `visualViewport` fallback**, which is not
+  optional there: measure `innerHeight - visualViewport.height - offsetTop` and pad
+  the shell by it. Listen to both `resize` and `scroll` (iOS scrolls the visual
+  viewport to reveal the caret), feature-detect `visualViewport`, and detach on
+  unmount. `hooks/useKeyboardInset.ts` is the implementation.
 - Never auto-focus the textarea on mount on a phone — it summons the keyboard
   before the user has seen the screen.
 

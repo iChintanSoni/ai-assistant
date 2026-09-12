@@ -12,13 +12,17 @@ import { useAttachments } from "../hooks/useAttachments";
 import { useBlockStrayFileDrops } from "../hooks/useBlockStrayFileDrops";
 import { useConversationUrlSync } from "../hooks/useConversationUrlSync";
 import { useFocusOnRouteChange } from "../hooks/useFocusOnRouteChange";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
 import { USER_NAME } from "../lib/config";
 import { fetchModels } from "../lib/models";
 import { routeViewFromPath } from "../lib/routeView";
 import { useChatStore } from "../store/chat";
 
+// h-dvh, not h-screen: 100vh on mobile measures the viewport with the browser
+// toolbar hidden, so the bottom of the layout — where the composer lives — sits
+// below the fold. Identical to 100vh on desktop.
 const SHELL_CLASS =
-  "relative flex h-screen w-screen overflow-hidden bg-white font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200";
+  "relative flex h-dvh w-full flex-col overflow-hidden bg-white pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] font-sans text-slate-800 antialiased md:flex-row dark:bg-slate-950 dark:text-slate-200";
 
 export type AttachmentsContext = ReturnType<typeof useAttachments>;
 
@@ -41,6 +45,8 @@ export function RootLayout() {
   useFocusOnRouteChange();
   useConversationUrlSync();
   useBlockStrayFileDrops();
+  // 0 unless the browser ignores interactive-widget (i.e. iOS Safari).
+  const keyboardInset = useKeyboardInset();
   // Staged attachments live here, not in the chat route: the route unmounts on a
   // trip to Files or Settings, which would silently discard files the user had
   // already picked (and leak their object URLs, since nothing revokes them on
@@ -62,7 +68,28 @@ export function RootLayout() {
   }, [setModels, setModelsError]);
 
   return (
-    <div className={SHELL_CLASS}>
+    <div
+      className={SHELL_CLASS}
+      // Also published as a custom property: padding can't move the position:fixed
+      // nav or the History sheet, and on iOS those are exactly what the keyboard
+      // covers.
+      style={
+        keyboardInset
+          ? ({ paddingBottom: keyboardInset, "--keyboard-inset": `${keyboardInset}px` } as React.CSSProperties)
+          : undefined
+      }
+    >
+      {/* The nav is first in the DOM — it's a landmark, and on desktop it's also
+          visually first. On a phone the bar is visually last, so the skip link is
+          what keeps that from costing keyboard users five tabs before the
+          composer. Reordering with CSS instead would fix one lane by breaking the
+          other. */}
+      <a
+        href="#main"
+        className="sr-only rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-40 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:bg-slate-900 dark:text-slate-100"
+      >
+        Skip to content
+      </a>
       <AuroraGlow />
       <Sidebar
         onNewChat={() => {
@@ -106,7 +133,15 @@ export function RootFallback() {
   );
 }
 
-/** Thin floating icon rail pinned to the far left. */
+/**
+ * Navigation, in two lanes: a bottom bar on phones — where thumbs are, and where
+ * it costs no horizontal room — and the thin floating rail from `md:` up.
+ *
+ * One <nav> with responsive classes rather than two components. `display: none`
+ * would correctly hide a second nav from real browsers and assistive tech — the
+ * reason to prefer one element is jsdom, which never loads the Tailwind stylesheet,
+ * so tests would see both sets of buttons and every getByRole would be ambiguous.
+ */
 function Sidebar({
   onNewChat,
   historyButtonRef,
@@ -127,8 +162,10 @@ function Sidebar({
   onOpenSettings: () => void;
 }) {
   return (
-    <nav className="relative z-20 flex h-full w-16 flex-col items-center justify-between py-6">
-      <div className="flex flex-col items-center gap-2">
+    <nav
+      className="fixed inset-x-0 bottom-[var(--keyboard-inset,0px)] z-20 flex items-center justify-around bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ring-1 ring-slate-200/70 backdrop-blur-md md:relative md:inset-auto md:h-full md:w-16 md:flex-col md:justify-between md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none dark:bg-slate-900/70 dark:ring-slate-700/60 md:dark:bg-transparent"
+    >
+      <div className="flex items-center gap-1 md:flex-col md:gap-2">
         <RailButton label="New chat" onClick={onNewChat}>
           <PlusIcon className="size-5" />
         </RailButton>
@@ -145,16 +182,19 @@ function Sidebar({
         </RailButton>
       </div>
 
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex items-center gap-1 md:flex-col md:gap-2">
         <RailButton label="Settings" onClick={onOpenSettings} active={settingsOpen}>
           <Cog6ToothIcon className="size-5" />
         </RailButton>
+        {/* The avatar stays 36px visually; the button pads out to the 44px touch floor. */}
         <button
           type="button"
           aria-label="Profile"
-          className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+          className="flex size-10 items-center justify-center rounded-full transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11"
         >
-          {USER_NAME.charAt(0)}
+          <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white">
+            {USER_NAME.charAt(0)}
+          </span>
         </button>
       </div>
     </nav>
@@ -172,7 +212,7 @@ const RailButton = forwardRef<
       aria-label={label}
       aria-pressed={active}
       onClick={onClick}
-      className={`group flex size-10 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+      className={`group flex size-10 items-center justify-center rounded-full pointer-coarse:size-11 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
         active
           ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
           : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"

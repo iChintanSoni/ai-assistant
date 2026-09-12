@@ -104,7 +104,7 @@ Min-width only, and the base case is a phone — see
 ## Layout constants
 
 - Sidebar width: `w-16` (`md:` and up).
-- Bottom bar: full width, `md:hidden`, padded with
+- Bottom bar: the same `<nav>` as the rail, full width below `md:`, padded with
   `pb-[max(0.5rem,env(safe-area-inset-bottom))]`.
 - Prompt hub max width: `max-w-2xl`.
 - Page gutters: `px-4` on phones, `md:px-6`.

@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover            : without it every env(safe-area-inset-*) reads 0,
+                                      and the bottom bar's padding collapses into the
+                                      iOS home-indicator strip.
+      interactive-widget=resizes-content : the default (resizes-visual) shrinks only the
+                                      visual viewport, so dvh stays put and the on-screen
+                                      keyboard covers the composer on our overflow-hidden
+                                      shell, with no way to scroll to it.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <title>AI Assistant</title>
     <script>
       (function () {

@@ -15,6 +15,15 @@
   --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
+/*
+  Height of the phone bottom bar: its pt-2 plus a 44px touch target. `main` reserves
+  it (a fixed bar can't push content) and the History sheet stacks on top of it, so
+  it lives here rather than being retyped at each call site and drifting.
+*/
+:root {
+  --nav-h: calc(3.25rem + max(0.5rem, env(safe-area-inset-bottom)));
+}
+
 html,
 body,
 #root {

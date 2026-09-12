@@ -123,6 +123,31 @@ test("the loader skips the fetch when that conversation is already the live one"
   expect(getConversation).not.toHaveBeenCalled();
 });
 
+test("one nav, first in the DOM, with a skip link past it", () => {
+  renderAt(["/"]);
+  const main = document.querySelector("main");
+  const nav = document.querySelector("nav");
+  if (!main || !nav) throw new Error("expected both a <main> and a <nav>");
+
+  // Siblings, nav first. The nav is a landmark and is visually first on desktop,
+  // so this is the order that matches. compareDocumentPosition is masked against
+  // CONTAINED_BY too — PRECEDING alone would also be true for a nested nav.
+  expect(nav.parentElement).toBe(main.parentElement);
+  const position = nav.compareDocumentPosition(main);
+  expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(position & Node.DOCUMENT_POSITION_CONTAINED_BY).toBeFalsy();
+
+  // On a phone the bar is visually last, so keyboard users need a way past it.
+  const skip = screen.getByRole("link", { name: /skip to content/i });
+  expect(skip).toHaveAttribute("href", `#${main.id}`);
+  expect(main.compareDocumentPosition(skip) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+
+  // One <nav> with two responsive lanes, not two components — otherwise every nav
+  // button would be duplicated for anything that doesn't evaluate breakpoints.
+  expect(document.querySelectorAll("nav")).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: "Files" })).toHaveLength(1);
+});
+
 test("the rail navigates between the three views", async () => {
   const user = userEvent.setup();
   const { router } = renderAt(["/"]);

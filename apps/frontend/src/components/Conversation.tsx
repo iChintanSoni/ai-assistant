@@ -164,7 +164,7 @@ function ThinkingBlock({ text, active }: { text: string; active: boolean }) {
           userToggled.current = true;
           setOpen((v) => !v);
         }}
-        className="flex items-center gap-1.5 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:text-slate-200"
+        className="flex min-h-10 items-center gap-1.5 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:min-h-11 dark:text-slate-400 dark:hover:text-slate-200"
       >
         <LightBulbIcon className="size-3.5" />
         <span>Thinking</span>
@@ -574,7 +574,7 @@ function CopyButton({ text, label = "response" }: { text: string; label?: string
         setTimeout(() => setCopied(false), 1500);
       }}
       aria-label={copied ? "Copied" : `Copy ${label}`}
-      className="flex w-fit items-center gap-1 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:text-slate-200"
+      className="flex min-h-10 w-fit items-center gap-1 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:min-h-11 dark:text-slate-400 dark:hover:text-slate-200"
     >
       {copied ? <CheckIcon className="size-3.5" /> : <ClipboardDocumentIcon className="size-3.5" />}
       <span>{copied ? "Copied" : "Copy"}</span>

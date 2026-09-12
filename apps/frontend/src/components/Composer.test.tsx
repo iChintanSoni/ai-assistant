@@ -31,13 +31,75 @@ beforeEach(() => {
   useChatStore.setState({ isStreaming: false, selectedModel: "m1", models: [model()] });
 });
 
-test("there is no Send button and the record button is the trailing action", () => {
+test("an empty composer offers the mic and no Send", () => {
   setup();
   const composer = screen.getByTestId("composer-surface");
   const record = screen.getByRole("button", { name: "Record voice message" });
   expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
   expect(composer.lastElementChild).toBe(record);
   expect(composer).toHaveAttribute("data-expanded", "false");
+});
+
+test("Send appears alongside the mic once there's something to send, and sends it", async () => {
+  const { send } = setup();
+  const user = userEvent.setup();
+
+  await user.type(screen.getByRole("textbox", { name: "Ask anything" }), "hello");
+
+  // Both, not either: voice input appends to an existing draft, so swapping the
+  // mic out for Send would make dictation reachable only from an empty composer.
+  expect(screen.getByRole("button", { name: "Record voice message" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Send" }));
+  expect(send).toHaveBeenCalledWith("hello", []);
+});
+
+test("Send is offered for an attachment with no text", () => {
+  setup({ attachments: [{ file: new File(["x"], "a.png", { type: "image/png" }), previewUrl: "blob:x" }] });
+  // submit() accepts this, so the UI has to offer a way to trigger it — on a soft
+  // keyboard there is no Enter-to-send to fall back on.
+  expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+});
+
+test("on a touch device Enter inserts a newline instead of sending", async () => {
+  // src/test/setup.ts stubs matchMedia to always report false, so the coarse-pointer
+  // lane is invisible unless a test opts into it explicitly.
+  const media = vi.spyOn(window, "matchMedia").mockImplementation(
+    (query: string) =>
+      ({
+        matches: query.includes("pointer: coarse"),
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList,
+  );
+  const { send } = setup();
+  const user = userEvent.setup();
+
+  const box = screen.getByRole("textbox", { name: "Ask anything" });
+  await user.type(box, "first line{Enter}second");
+
+  // A soft keyboard has no Shift+Enter, so Enter has to stay a newline — Send is
+  // the only way to submit, which is why it has to exist.
+  expect(send).not.toHaveBeenCalled();
+  expect(box).toHaveValue("first line\nsecond");
+  expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+  media.mockRestore();
+});
+
+test("while streaming the trailing control is Stop, not Send or the mic", async () => {
+  const { send } = setup();
+  const user = userEvent.setup();
+  await user.type(screen.getByRole("textbox", { name: "Ask anything" }), "hi");
+  useChatStore.setState({ isStreaming: true });
+
+  expect(await screen.findByRole("button", { name: "Stop" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Record voice message" })).not.toBeInTheDocument();
+  expect(send).not.toHaveBeenCalled();
 });
 
 test("pressing Enter calls send() with the typed text and clears the draft", async () => {
