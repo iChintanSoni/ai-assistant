@@ -130,8 +130,7 @@ test("the focal content precedes the nav in the DOM, and there's only one nav", 
   renderAt(["/"]);
   const main = document.querySelector("main");
   const nav = document.querySelector("nav");
-  expect(main).not.toBeNull();
-  expect(nav).not.toBeNull();
+  if (!main || !nav) throw new Error("expected both a <main> and a <nav>");
   expect(main.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   // One <nav> with two responsive lanes, not two components — otherwise every nav
   // button would be duplicated in the accessibility tree.
