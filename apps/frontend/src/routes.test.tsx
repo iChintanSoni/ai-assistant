@@ -123,6 +123,22 @@ test("the loader skips the fetch when that conversation is already the live one"
   expect(getConversation).not.toHaveBeenCalled();
 });
 
+test("the focal content precedes the nav in the DOM, and there's only one nav", async () => {
+  // On a phone the nav is a bottom bar — visually last. If it came first in the
+  // DOM, every keyboard and screen-reader user would traverse the whole nav before
+  // reaching the composer. md:order-first moves it back to the left visually.
+  renderAt(["/"]);
+  const main = document.querySelector("main");
+  const nav = document.querySelector("nav");
+  expect(main).not.toBeNull();
+  expect(nav).not.toBeNull();
+  expect(main.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // One <nav> with two responsive lanes, not two components — otherwise every nav
+  // button would be duplicated in the accessibility tree.
+  expect(document.querySelectorAll("nav")).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: "Files" })).toHaveLength(1);
+});
+
 test("the rail navigates between the three views", async () => {
   const user = userEvent.setup();
   const { router } = renderAt(["/"]);

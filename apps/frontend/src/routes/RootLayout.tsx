@@ -17,8 +17,11 @@ import { fetchModels } from "../lib/models";
 import { routeViewFromPath } from "../lib/routeView";
 import { useChatStore } from "../store/chat";
 
+// h-dvh, not h-screen: 100vh on mobile measures the viewport with the browser
+// toolbar hidden, so the bottom of the layout — where the composer lives — sits
+// below the fold. Identical to 100vh on desktop.
 const SHELL_CLASS =
-  "relative flex h-screen w-screen overflow-hidden bg-white font-sans text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200";
+  "relative flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-slate-800 antialiased md:flex-row dark:bg-slate-950 dark:text-slate-200";
 
 export type AttachmentsContext = ReturnType<typeof useAttachments>;
 
@@ -64,6 +67,16 @@ export function RootLayout() {
   return (
     <div className={SHELL_CLASS}>
       <AuroraGlow />
+      {/* Outlet before the nav: on a phone the bar is visually last, so this is
+          what keeps tab order matching what the user sees. md:order-first on the
+          nav puts the rail back on the left without moving it back up the tab
+          sequence. */}
+      <Outlet context={attachments} />
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        triggerRef={historyButtonRef}
+      />
       <Sidebar
         onNewChat={() => {
           newChat();
@@ -83,12 +96,6 @@ export function RootLayout() {
           setHistoryOpen(false);
         }}
       />
-      <HistoryPanel
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        triggerRef={historyButtonRef}
-      />
-      <Outlet context={attachments} />
     </div>
   );
 }
@@ -106,7 +113,15 @@ export function RootFallback() {
   );
 }
 
-/** Thin floating icon rail pinned to the far left. */
+/**
+ * Navigation, in two lanes: a bottom bar on phones — where thumbs are, and where
+ * it costs no horizontal room — and the thin floating rail from `md:` up.
+ *
+ * One <nav> with responsive classes rather than two components, so there is never
+ * a duplicate set of nav buttons in the accessibility tree (CSS `hidden` wouldn't
+ * hide the second set from assistive tech queries or from tests, which don't
+ * evaluate Tailwind breakpoints).
+ */
 function Sidebar({
   onNewChat,
   historyButtonRef,
@@ -127,8 +142,10 @@ function Sidebar({
   onOpenSettings: () => void;
 }) {
   return (
-    <nav className="relative z-20 flex h-full w-16 flex-col items-center justify-between py-6">
-      <div className="flex flex-col items-center gap-2">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around bg-white/70 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] ring-1 ring-slate-200/70 backdrop-blur-md md:relative md:inset-auto md:order-first md:h-full md:w-16 md:flex-col md:justify-between md:bg-transparent md:px-0 md:py-6 md:ring-0 md:backdrop-blur-none dark:bg-slate-900/70 dark:ring-slate-700/60 md:dark:bg-transparent"
+    >
+      <div className="flex items-center gap-1 md:flex-col md:gap-2">
         <RailButton label="New chat" onClick={onNewChat}>
           <PlusIcon className="size-5" />
         </RailButton>
@@ -145,16 +162,19 @@ function Sidebar({
         </RailButton>
       </div>
 
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex items-center gap-1 md:flex-col md:gap-2">
         <RailButton label="Settings" onClick={onOpenSettings} active={settingsOpen}>
           <Cog6ToothIcon className="size-5" />
         </RailButton>
+        {/* The avatar stays 36px visually; the button pads out to the 44px touch floor. */}
         <button
           type="button"
           aria-label="Profile"
-          className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+          className="flex size-10 items-center justify-center rounded-full transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 md:size-9 md:pointer-coarse:size-11"
         >
-          {USER_NAME.charAt(0)}
+          <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white">
+            {USER_NAME.charAt(0)}
+          </span>
         </button>
       </div>
     </nav>
@@ -172,7 +192,7 @@ const RailButton = forwardRef<
       aria-label={label}
       aria-pressed={active}
       onClick={onClick}
-      className={`group flex size-10 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
+      className={`group flex size-10 items-center justify-center rounded-full pointer-coarse:size-11 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 ${
         active
           ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
           : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"

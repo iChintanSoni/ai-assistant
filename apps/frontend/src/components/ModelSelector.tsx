@@ -54,7 +54,7 @@ export function ModelSelector() {
         aria-expanded={open}
         disabled={models.length === 0}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pr-2 pl-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-50 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80"
+        className="flex min-h-10 items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pr-2 pl-3 text-sm font-medium text-slate-600 pointer-coarse:min-h-11 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-50 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80"
       >
         <SparklesIcon className="size-4 text-blue-500 dark:text-blue-400" />
         <span className="hidden max-w-[9rem] truncate sm:inline">{selected ?? "No models"}</span>

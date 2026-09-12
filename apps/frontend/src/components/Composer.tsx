@@ -69,10 +69,10 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
       <div
         data-testid="composer-surface"
         data-expanded={hasAttachments}
-        className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-x-2 bg-white/70 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 dark:bg-slate-900/70 dark:ring-slate-700/60 ${
+        className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 bg-white/70 ring-1 ring-slate-200/70 backdrop-blur-md transition focus-within:ring-blue-300/70 md:grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] dark:bg-slate-900/70 dark:ring-slate-700/60 ${
           hasAttachments
-            ? "min-h-64 grid-rows-[auto_minmax(1.5rem,1fr)_auto] gap-y-3 rounded-3xl px-5 py-4"
-            : "grid-rows-1 rounded-full px-3 py-2.5"
+            ? "grid-rows-[auto_auto_auto] gap-y-3 rounded-3xl px-4 py-3 md:min-h-64 md:grid-rows-[auto_minmax(1.5rem,1fr)_auto] md:px-5 md:py-4"
+            : "grid-rows-[auto_auto] gap-y-2 rounded-3xl px-4 py-3 md:grid-rows-1 md:gap-y-0 md:rounded-full md:px-3 md:py-2.5"
         }`}
       >
         {hasAttachments && (
@@ -85,8 +85,8 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           type="button"
           aria-label="Add attachment"
           onClick={() => fileInput.current?.click()}
-          className={`col-start-1 flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${
-            hasAttachments ? "row-start-3" : "row-start-1"
+          className={`col-start-1 flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${
+            hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
           }`}
         >
           <PlusIcon className="size-6" aria-hidden="true" />
@@ -118,15 +118,25 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
           aria-label="Ask anything"
           className={`max-h-40 min-h-6 min-w-0 resize-none overflow-y-auto bg-transparent text-base leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-hidden dark:text-slate-100 dark:placeholder:text-slate-500 ${
             hasAttachments
-              ? "col-span-full row-start-2 self-stretch px-2"
-              : "col-start-2 row-start-1"
+              ? "col-span-full row-start-2 self-stretch px-2 py-2.5 md:py-0"
+              : "col-span-full row-start-1 px-2 py-2.5 md:col-span-1 md:col-start-2 md:px-0 md:py-0"
           }`}
         />
 
-        <div className={`col-start-3 ${hasAttachments ? "row-start-3" : "row-start-1"}`}>
+        {/* Secondary readout — the first thing to go when width is scarce, same
+            precedent as the model selector hiding its label below sm. */}
+        <div
+          className={`col-start-2 hidden justify-self-end sm:block md:col-start-3 md:justify-self-auto ${
+            hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
+          }`}
+        >
           <UsageGauge />
         </div>
-        <div className={`col-start-4 ${hasAttachments ? "row-start-3" : "row-start-1"}`}>
+        <div
+          className={`col-start-3 md:col-start-4 ${
+            hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
+          }`}
+        >
           <ModelSelector />
         </div>
 
@@ -135,8 +145,8 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
             type="button"
             onClick={() => void stop()}
             aria-label="Stop"
-            className={`col-start-5 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 dark:bg-slate-700 dark:hover:bg-slate-600 ${
-              hasAttachments ? "row-start-3" : "row-start-1"
+            className={`col-start-4 flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11 md:col-start-5 dark:bg-slate-700 dark:hover:bg-slate-600 ${
+              hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
             }`}
           >
             <StopIcon className="size-5" aria-hidden="true" />
@@ -153,8 +163,8 @@ export function Composer({ attachments, notice, addFiles, removeAttachment, clea
             }
             onClick={voice.toggle}
             disabled={voice.state === "transcribing" || isSending}
-            className={`col-start-5 flex size-10 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 ${
-              hasAttachments ? "row-start-3" : "row-start-1"
+            className={`col-start-4 flex size-10 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-40 pointer-coarse:size-11 md:col-start-5 ${
+              hasAttachments ? "row-start-3" : "row-start-2 md:row-start-1"
             } ${
               voice.state === "recording"
                 ? "bg-rose-100 text-rose-600 hover:bg-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:hover:bg-rose-500/30"
