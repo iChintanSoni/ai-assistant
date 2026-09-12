@@ -498,7 +498,7 @@ traverses conversations; a failed conversation load still redirects to `/`;
 focus moves to the new view on navigate; the old hook and its ad-hoc callbacks
 are gone; tests ported.
 
-## F2 — Mobile-first in the design system *(skill done; screens in progress)*
+## F2 — Mobile-first in the design system ✅ *done*
 
 The **design-system half has landed**: `references/responsive.md` is written, and
 `layout.md`'s stance, `tokens.md`'s breakpoint ladder and 44px tap-target floor,
@@ -507,10 +507,25 @@ The **design-system half has landed**: `references/responsive.md` is written, an
 the `w-16` rail above it. What remains is retrofitting the four screens, in the
 order listed below.
 
-Baseline measured on `main` at 375×812 before the rules were written: the composer
-textarea was 37px wide (placeholder wrapping one character per line), the rail took
-64px of 375px, the History flyout ran 25px off-screen, the Files grid rendered two
-115px columns, and 9/34/25 controls sat under 44px on hub/Files/Settings.
+All four screens have been retrofitted. Measured at 375×812, before → after:
+
+| | Before | After |
+| --- | --- | --- |
+| Composer textarea | 37 × 96px | 311 × 44px |
+| Nav | 64px rail (17% of the viewport) | bottom bar, `main` full width |
+| History panel | ran 25px off-screen | full-width bottom sheet |
+| Files grid | two 115px columns | one column |
+| Controls under 44px (hub / Files / Settings) | 9 / 34 / 25 | **0 / 0 / 0** |
+
+Along the way this surfaced a class of bug worth naming: every destructive control
+in the app was `opacity-0 group-hover:opacity-100`. A touch device never hovers, so
+deleting a conversation, a file, or a model was **impossible** on a phone — the
+controls were not merely small, they were invisible. They are now shown under
+`pointer-coarse:` and hover-revealed only where there's a fine pointer.
+
+Desktop is unchanged throughout: the rail returns at `md:`, the composer collapses
+back to its single-row `rounded-full` pill, the History flyout re-anchors to the
+rail, and the Files grid keeps its 4/5-column densities.
 
 **Was:** the `aurora-design` skill documents a desktop-only shell —
 `h-screen w-screen overflow-hidden` with a fixed `w-16` rail
