@@ -172,6 +172,36 @@ impersonate one. Two related traps in the same area, both worth knowing:
   Child effects also run before parent effects, so moving one up a level doesn't fix
   the ordering.
 
+## `crypto.randomUUID` is secure-context-only, and it fails *loudly but late*
+
+**General browser lesson, not specific to this repo.** The usual list of
+secure-context-gated APIs is service workers, `navigator.mediaDevices`,
+`navigator.clipboard` — the ones you expect to check. `crypto.randomUUID` is on that
+list too, and it is easy to miss because it looks like a pure utility with no
+privacy dimension. `crypto.getRandomValues` on the same object is **not** gated, so
+"crypto works" is not a useful signal either.
+
+`localhost` is treated as a secure context, so this is invisible during normal
+development. It surfaced here the first time the app was opened over the LAN
+(`http://<machine>.local:5173`, which is *not* a secure context): the page rendered
+perfectly, models loaded, the composer worked — and pressing Send produced
+`crypto.randomUUID is not a function`, because `useChat.ts` mints the A2A
+`messageId` with it. Chat was completely broken while everything around it looked
+healthy, which is the worst version of this failure: the page gives no hint that the
+origin is the problem.
+
+**Fix** (`apps/frontend/src/lib/uuid.ts`): a `randomUUID()` that prefers the native
+one and otherwise assembles a v4 from `crypto.getRandomValues` — still
+cryptographically random, just laying out the version/variant bits by hand. Call
+sites in `useChat.ts` and `store/chat.ts` use it instead.
+
+Two things generalise. **Audit for secure-context APIs before assuming a page works
+off `localhost`** — `mediaDevices`, `clipboard`, `randomUUID`, service workers, and
+`crypto.subtle` (but not `getRandomValues`). And **the failure mode is a missing
+function, not a thrown permission error**, so it reads like a bundling bug rather
+than an origin problem. See [setup.md](setup.md#using-it-from-your-phone) for the
+ones this app still can't do over plain http.
+
 ## A local single-GPU Ollama instance serializes requests — don't `Promise.all` them
 
 Firing multiple chunk-summarization LLM calls concurrently via `Promise.all`

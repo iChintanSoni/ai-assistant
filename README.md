@@ -60,7 +60,8 @@ cp apps/frontend/.env.example apps/frontend/.env
 npm run dev
 ```
 
-Open `http://localhost:5173`. Full setup (optional Docling/Tavily/embedding
+Open `http://localhost:5173`. To use it from your phone, run `npm run dev:lan`
+and see [docs/setup.md](docs/setup.md#using-it-from-your-phone). Full setup (optional Docling/Tavily/embedding
 model/`uv`/whisper-cpp/ffmpeg, every env var explained):
 [docs/setup.md](docs/setup.md).
 

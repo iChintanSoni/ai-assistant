@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import type { ModelInfo } from "../lib/models";
 import type { ApprovalRequest, Envelope } from "../lib/envelope";
+import { randomUUID } from "../lib/uuid";
 
 export type TurnStatus = "streaming" | "complete" | "canceled" | "failed" | "input-required";
 
@@ -190,7 +191,7 @@ export const useChatStore = create<ChatState>((set) => ({
       turns: [
         ...s.turns,
         {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           role: "user",
           text: userText,
           reasoning: "",
@@ -201,7 +202,7 @@ export const useChatStore = create<ChatState>((set) => ({
           timestamp: Date.now(),
         },
         {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           role: "agent",
           text: "",
           reasoning: "",
@@ -228,7 +229,7 @@ export const useChatStore = create<ChatState>((set) => ({
           return {
             turns: mapLastAgent(s.turns, (t) =>
               upsertTool(t, {
-                id: env.id ?? crypto.randomUUID(),
+                id: env.id ?? randomUUID(),
                 name: env.name ?? "tool",
                 args: env.args,
                 status: "started",
@@ -239,7 +240,7 @@ export const useChatStore = create<ChatState>((set) => ({
           return {
             turns: mapLastAgent(s.turns, (t) =>
               upsertTool(t, {
-                id: env.id ?? crypto.randomUUID(),
+                id: env.id ?? randomUUID(),
                 name: env.name ?? "tool",
                 output: env.output,
                 status: "completed",
@@ -249,7 +250,7 @@ export const useChatStore = create<ChatState>((set) => ({
         case "approval":
           return { turns: mapLastAgent(s.turns, (t) => ({ ...t, approvals: env.requests ?? [] })) };
         case "subagent": {
-          const id = env.id ?? crypto.randomUUID();
+          const id = env.id ?? randomUUID();
           const patch: Partial<UIToolCall> = {
             status: env.status === "completed" ? "completed" : "started",
           };
@@ -268,7 +269,7 @@ export const useChatStore = create<ChatState>((set) => ({
             ? {
                 turns: mapLastAgent(s.turns, (t) => ({
                   ...t,
-                  compactions: [...(t.compactions ?? []), { id: env.id ?? crypto.randomUUID(), summary: env.output as string }],
+                  compactions: [...(t.compactions ?? []), { id: env.id ?? randomUUID(), summary: env.output as string }],
                 })),
               }
             : {};

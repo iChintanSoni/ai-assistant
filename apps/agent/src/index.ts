@@ -11,7 +11,7 @@ startFileCleanup();
 reconcileStuckDocuments();
 backfillAttachmentsIndex();
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, config.host, () => {
   console.log(`[agent] Aurora A2A server listening on ${config.publicUrl}`);
   console.log(`[agent]   agent card : ${config.publicUrl}/.well-known/agent-card.json`);
   console.log(`[agent]   json-rpc   : ${config.publicUrl}/a2a`);

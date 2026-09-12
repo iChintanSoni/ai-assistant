@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently -k -n agent,web,files -c blue,magenta,green \"npm:dev:agent\" \"npm:dev:web\" \"npm:dev:files\"",
+    "dev:lan": "concurrently -k -n agent,web,files -c blue,magenta,green \"npm:dev:agent\" \"npm:dev:web:host\" \"npm:dev:files\"",
     "dev:agent": "npm run dev -w agent",
     "dev:web": "npm run dev -w frontend",
+    "dev:web:host": "npm run dev:host -w frontend",
     "dev:files": "npm run dev -w file-storage",
     "typecheck": "npm run typecheck -w agent && npm run typecheck -w frontend && npm run typecheck -w file-storage && npm run typecheck -w mcp-authoring && npm run typecheck -w @ai-assistant/shared-node",
     "test": "vitest run",

@@ -7,6 +7,10 @@ const port = Number(process.env.PORT ?? 4000);
 
 export const config = {
   port,
+  // Which interfaces to listen on. Node's default (all of them) is kept so nothing
+  // changes for existing setups — but the agent has no authentication and can run
+  // sandboxed code, so on a shared network set HOST=127.0.0.1 to keep it local.
+  host: process.env.HOST ?? "0.0.0.0",
   publicUrl: process.env.PUBLIC_URL ?? `http://localhost:${port}`,
   ollamaBaseUrl: (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434").replace(/\/$/, ""),
   defaultModel: process.env.DEFAULT_MODEL ?? "gemma4:12b",
