@@ -84,9 +84,10 @@ arbitrary values like `/37`.
 - Greeting → input gap: `mb-10`.
 - Intra-pill gaps: `gap-3` (major), `gap-1.5` (tight, e.g. selector internals).
 - Rail vertical padding: `py-6`; rail item gap: `gap-2`.
-- Hit targets: `size-11` (44px) is the floor on touch; `size-10` (40px) is fine
-  from `md:` up, where there's a pointer. `size-9` (avatar) must pad its hit area
-  to reach the floor — see [accessibility.md](accessibility.md).
+- Hit targets: `size-10` (40px) by default, `pointer-coarse:size-11` (44px) where
+  the pointer is imprecise. Keyed on the pointer, not the viewport width — see
+  [accessibility.md](accessibility.md), which also covers how a visually smaller
+  control (the `size-9` avatar) pads its hit area to reach the floor.
 
 ## Breakpoints
 

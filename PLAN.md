@@ -246,11 +246,17 @@ back. The golden rule: separation comes from **whitespace and the glow**, never
 borders, shadows, or cards.
 
 Mobile-first (decision 7) changes the *starting point*, not the visual
-language. It does conflict with the skill's current `h-screen w-screen
-overflow-hidden` + fixed `w-16` rail shell, so the resolution is explicit:
-**update the skill, never diverge from it** (§F2). A component that styles
-itself mobile-first while the skill still documents desktop-only shells is
-worse than either consistent option.
+language. It conflicted with the skill's then-current `h-screen w-screen
+overflow-hidden` + fixed `w-16` rail shell, and the resolution was explicit:
+**update the skill, never diverge from it**. That half of §F2 has landed — the
+skill now documents `h-dvh`, a bottom bar below `md:`, and a 44px
+coarse-pointer touch floor.
+
+While the screen retrofits are in flight the app trails the skill rather than
+leading it. That direction is the safe one: the skill is the target every screen
+is moving toward, and §F2 names the remaining ones. The reverse — a component
+styling itself mobile-first while the skill still documented desktop-only
+shells — is the one to avoid.
 
 ## I12. Docs are part of the product
 
@@ -508,9 +514,11 @@ textarea was 37px wide (placeholder wrapping one character per line), the rail t
 
 **Was:** the `aurora-design` skill documents a desktop-only shell —
 `h-screen w-screen overflow-hidden` with a fixed `w-16` rail
-(`references/layout.md`) — and `App.tsx` implements exactly that. `index.html`
-already has the right viewport meta, so nothing is actively broken, but nothing
-is adapted either.
+(`references/layout.md`) — and `App.tsx` implements exactly that. `index.html`'s
+viewport meta is the plain `width=device-width, initial-scale=1`, which is *not*
+enough: without `viewport-fit=cover` every `env(safe-area-inset-*)` reads 0, and
+without `interactive-widget=resizes-content` the on-screen keyboard covers the
+composer on an `overflow-hidden` shell.
 
 **Why change:** decision 7. And the skill must stay the single source of truth
 (§I11), so the skill changes *first*.

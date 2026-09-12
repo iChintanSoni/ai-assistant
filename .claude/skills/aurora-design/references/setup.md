@@ -43,7 +43,7 @@ export default defineConfig({
 html,
 body,
 #root {
-  height: 100%;   /* required so h-dvh / h-full fill the viewport */
+  height: 100%;   /* so h-full descendants fill the page; h-dvh needs no ancestor height */
   margin: 0;
 }
 ```

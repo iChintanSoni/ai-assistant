@@ -13,10 +13,10 @@ function App() {
   return (
     <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-slate-800 antialiased md:flex-row">
       <AuroraGlow />
-      <BottomBar />
-      <Sidebar />
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-20 md:px-6 md:pb-0">
+      {/* `main` before the nav so tab order matches the phone's visual order — the
+          bar is at the bottom. `md:order-first` on the nav restores the left rail. */}
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] md:px-6 md:pb-0">
         <h1 className="mb-10 text-center text-4xl font-medium tracking-tight text-slate-900 sm:text-5xl">
           Hi {USER_NAME},{' '}
           <span className="bg-linear-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
@@ -26,6 +26,9 @@ function App() {
 
         <PromptBar />
       </main>
+
+      <BottomBar />
+      <Sidebar />
     </div>
   )
 }
@@ -47,7 +50,6 @@ function AuroraGlow() {
   )
 }
 
-/** Thin, floating vertical icon rail pinned to the far left. */
 /** Phones: nav pinned to the bottom edge, where thumbs are. Retires at `md:`. */
 function BottomBar() {
   return (
@@ -67,7 +69,7 @@ function BottomBar() {
       <button
         type="button"
         aria-label="Profile"
-        className="flex size-11 items-center justify-center rounded-full focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+        className="flex size-10 items-center justify-center rounded-full pointer-coarse:size-11 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
       >
         <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white">
           {USER_NAME.charAt(0)}
@@ -80,7 +82,7 @@ function BottomBar() {
 /** `md:` and up: the thin floating rail. */
 function Sidebar() {
   return (
-    <nav className="relative z-20 hidden h-full w-16 flex-col items-center justify-between py-6 md:flex">
+    <nav className="relative z-20 hidden h-full w-16 flex-col items-center justify-between py-6 md:order-first md:flex">
       <div className="flex flex-col items-center gap-2">
         <RailButton label="New chat">
           <PlusIcon />
@@ -99,9 +101,11 @@ function Sidebar() {
       <button
         type="button"
         aria-label="Profile"
-        className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+        className="flex size-10 items-center justify-center rounded-full transition-transform hover:scale-105 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:size-11"
       >
-        {USER_NAME.charAt(0)}
+        <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-indigo-500 text-sm font-medium text-white">
+          {USER_NAME.charAt(0)}
+        </span>
       </button>
     </nav>
   )
@@ -118,7 +122,7 @@ function RailButton({
     <button
       type="button"
       aria-label={label}
-      className="group flex size-11 items-center justify-center rounded-full md:size-10 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+      className="group flex size-10 items-center justify-center rounded-full pointer-coarse:size-11 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
     >
       {children}
     </button>
@@ -136,7 +140,7 @@ function PromptBar() {
         <button
           type="button"
           aria-label="Add attachment"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full text-slate-500 md:size-10 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 pointer-coarse:size-11 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
         >
           <PlusIcon />
         </button>
@@ -153,7 +157,7 @@ function PromptBar() {
         <button
           type="button"
           aria-label="Voice input"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full text-slate-500 md:size-10 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 pointer-coarse:size-11 transition-colors hover:bg-slate-100 hover:text-slate-900 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
         >
           <MicIcon />
         </button>
@@ -167,7 +171,7 @@ function ModelSelector() {
   return (
     <button
       type="button"
-      className="flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pl-3 pr-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
+      className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-slate-100/80 py-1.5 pl-3 pr-2 text-sm font-medium text-slate-600 pointer-coarse:min-h-11 transition-colors hover:bg-slate-200/80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60"
     >
       <SparkleIcon />
       <span className="hidden sm:inline">Opus 4.8</span>

@@ -29,7 +29,7 @@ Rules:
 - **Always** `fill: 'none'` + `stroke: 'currentColor'`. Color comes from the parent's
   `text-*` class, so the same icon adapts to rest/hover/accent states for free.
 - **Always** `strokeWidth: 1.5`. This thinness is the house style; never use filled or 2px+ heavy icons.
-- Render at `width/height: 20` inside `size-10` buttons; smaller inline icons
+- Render at `width/height: 20` inside `size-10 pointer-coarse:size-11` buttons; smaller inline icons
   (sparkle, chevron) render at `16` and may set their own color, e.g.
   `className="text-blue-500"`.
 

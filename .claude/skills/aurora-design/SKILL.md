@@ -47,11 +47,10 @@ tokens and patterns instead of inventing new ones.
 ```tsx
 <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white font-sans text-slate-800 antialiased md:flex-row">
   <AuroraGlow />   {/* decorative, aria-hidden, pointer-events-none */}
-  <BottomBar />    {/* phones: nav pinned to the bottom edge, md:hidden */}
-  <Sidebar />      {/* md:+ : thin w-16 rail, avatar pinned bottom */}
-  <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 md:px-6">
+  <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-[calc(3.25rem+max(0.5rem,env(safe-area-inset-bottom)))] md:px-6 md:pb-0">
     {/* one centered focal interaction */}
   </main>
+  <Nav />          {/* bottom bar on phones, md:order-first rail above */}
 </div>
 ```
 
@@ -85,7 +84,7 @@ Full, runnable reference: [examples/HomePage.tsx](examples/HomePage.tsx) +
 - [ ] Accent stays blue→indigo (`from-blue-500 to-indigo-500`); neutrals stay `slate-*`.
 - [ ] Every hardcoded light token has a `dark:` companion — see [references/dark-mode.md](references/dark-mode.md).
 - [ ] Designed at phone width first; verified at **375×812 and 1440×900**, light and dark.
-- [ ] Touch targets ≥ 44px (`size-11`); `size-10` only from `md:` up.
+- [ ] Touch targets ≥ 44px with a coarse pointer (`size-10 pointer-coarse:size-11`).
 - [ ] The shell uses `h-dvh`, not `h-screen`, and nothing scrolls sideways at 375px.
 
 ## External references
