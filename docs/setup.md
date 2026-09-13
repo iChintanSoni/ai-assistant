@@ -147,6 +147,34 @@ To reach it from another device, use `npm run dev:lan` instead — see
 
 Then open `http://localhost:5173`.
 
+## Installing the app (PWA)
+
+`npm run dev` never registers a service worker (by design — see
+[docs/frontend.md](frontend.md#pwa--installable-offline-shell)), so
+installability only shows up against a production build:
+
+```
+npm run build -w frontend
+npm run preview -w frontend
+```
+
+Open the printed `http://localhost:4173` URL:
+
+- **Desktop (Chrome/Edge)**: an install icon appears in the address bar;
+  installing opens it as its own window with the app shell available
+  offline.
+- **Android (Chrome)**: "Add to Home Screen" from the menu.
+- **iOS (Safari)**: Share → "Add to Home Screen" (uses `apple-touch-icon.png`
+  directly; iOS doesn't read the web manifest for this).
+
+**Resetting a stale service worker.** If a previous production build's
+service worker is still active in your browser (from testing against
+`vite preview`, or `devOptions` ever having been flipped on locally) and the
+app seems to be serving old code: DevTools → Application → Service Workers →
+**Unregister**, then a hard reload (`Cmd+Shift+R` / `Ctrl+Shift+R`). This
+should never be needed for `npm run dev` itself, since dev intentionally
+never registers one.
+
 ## Using it from your phone
 
 The UI is mobile-first, but `npm run dev` binds the frontend to localhost only, so
@@ -196,10 +224,14 @@ from whatever address you loaded the page at (`lib/config.ts`), so browsing to
 ### What won't work over the LAN
 
 `http://` on anything other than `localhost` is not a **secure context**, so the
-browser withholds two APIs:
+browser withholds three things:
 
 - **Voice input** — `navigator.mediaDevices` is undefined, so the mic button fails.
 - **Copy buttons** — `navigator.clipboard` is undefined.
+- **Installing the app / offline support** — service workers only register in a
+  secure context, so `http://my-macbook.local:5173` never gets one. The phone
+  can still use the app fully; it just always talks to a live, freshly-loaded
+  page rather than an installed, offline-capable shell.
 
 Everything else — chat, streaming, approvals, History, Files, Settings, uploads —
 works normally. Fixing these needs HTTPS across all three services, which isn't

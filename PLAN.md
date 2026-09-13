@@ -557,10 +557,24 @@ composer on an `overflow-hidden` shell.
 375px wide with no horizontal scroll, in light and dark; §P5's phone-viewport
 verification is actually passable.
 
-## F3 — PWA: installable, offline shell
+## F3 — PWA: installable, offline shell ✅ *done*
 
-**Now:** a plain Vite SPA — no manifest, no service worker, no icons beyond
-`favicon.svg`.
+Landed on `feat/pwa-installable-shell`: `vite-plugin-pwa` in `generateSW`
+mode, a manifest with one safe-zone-padded icon design carrying
+`purpose: "any maskable"`, and a `<meta name="theme-color">` kept in sync
+with the app's *resolved* theme (not bare `prefers-color-scheme`, since
+`store/theme.ts`'s preference can override it) rather than a static
+per-scheme value. No `runtimeCaching` rules — precache-only, so the agent/
+file-storage origins are never touched. `devOptions` stays off, confirmed
+live that `npm run dev` registers no service worker while a production
+`preview` build does, activates, and serves the shell (verified by forcing
+Chrome's network-offline state and reloading) with a new `OfflineBanner`
+(`navigator.onLine`-driven, distinct from the pre-existing `modelsError`
+fetch-failure note) rendering alongside it. Full shape/rationale below is
+kept as the original design record.
+
+**Now (before this landed):** a plain Vite SPA — no manifest, no service
+worker, no icons beyond `favicon.svg`.
 
 **Why:** decision 9. Concretely valuable here because the transcript is already
 persisted server-side and conversations are the main thing you return to — an

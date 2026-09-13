@@ -46,6 +46,7 @@
     "jsdom": "^29",
     "typescript": "^6",
     "typescript-eslint": "^8",
-    "vite": "^8"
+    "vite": "^8",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }

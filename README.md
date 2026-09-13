@@ -80,6 +80,7 @@ All phases below are built and browser-verified:
 - ✅ Three-tier extensibility architecture (MCP client, first-party MCP server, peer A2A agents)
 - ✅ Document/diagram generation (docx/pptx/pdf/xlsx/csv/txt, draw.io) + URL reading + mermaid diagrams
 - ✅ Voice input (local whisper.cpp transcription)
+- ✅ Installable PWA with an offline-capable app shell
 
 Not built: authentication/multi-user support, a hosted deployment story —
 this is a personal, single-user, local-first project. CI runs typecheck +

@@ -1,5 +1,6 @@
 /** Appearance setting: Auto/Light/Dark preference, resolved against system scheme. */
 import { create } from "zustand";
+import { THEME_COLOR } from "../lib/themeColors";
 
 export type ThemePreference = "auto" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
@@ -21,6 +22,7 @@ function resolveTheme(preference: ThemePreference, prefersDark: boolean): Resolv
 
 function applyThemeClass(resolved: ResolvedTheme) {
   document.documentElement.classList.toggle("dark", resolved === "dark");
+  document.getElementById("theme-color-meta")?.setAttribute("content", THEME_COLOR[resolved]);
 }
 
 interface ThemeState {
