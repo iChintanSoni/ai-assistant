@@ -142,37 +142,46 @@ an offline-capable app shell (decision 9 in `PLAN.md`).
 - **Manifest + icons**: `manifest.name`/`icons`/`theme_color`/
   `background_color` are declared inline in the `VitePWA({...})` plugin
   config — the `<link rel="manifest">` is auto-injected into the built
-  `index.html`, no manual edit needed. Both `public/icon-192.png` and
-  `public/icon-512.png` are the same safe-zone-padded design (the
-  `favicon.svg` glow-mark centered at ~60% scale on a `#020617` square) so
-  one image can carry `purpose: "any maskable"` — an OS adaptive-icon mask
-  never crops it. Regenerate them if `favicon.svg` changes:
+  `index.html`, no manual edit needed. `public/icon-192.png` and
+  `public/icon-512.png` are the `favicon.svg` glow-mark centered at ~60%
+  scale on a `#020617` square (both carry `purpose: "any maskable"` — an
+  Android adaptive-icon mask crops aggressively, so the safe-zone padding
+  matters there). `public/apple-touch-icon.png` uses the *same* source at a
+  larger ~85% scale instead: iOS applies its own, much gentler corner
+  rounding and expects a fuller icon, so reusing the 60%-scale maskable
+  version there looks tiny and over-padded. Regenerate both if
+  `favicon.svg` changes:
   ```sh
   python3 - <<'EOF'
   import re
   src = open("public/favicon.svg", encoding="utf-8").read()
   inner = re.match(r'^<svg[^>]*>(.*)</svg>\s*$', src, re.S).group(1)
-  open("/tmp/pwa-icon.svg", "w").write(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">'
-      '<rect width="512" height="512" fill="#020617"/>'
-      f'<g transform="translate(102.4 108.8) scale(6.4)">{inner}</g></svg>'
-  )
+  def wrap(scale_pct):
+      scale = 512 * scale_pct / 48
+      tx, ty = (512 - 48 * scale) / 2, (512 - 46 * scale) / 2
+      return ('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">'
+              '<rect width="512" height="512" fill="#020617"/>'
+              f'<g transform="translate({tx:.3f} {ty:.3f}) scale({scale:.4f})">{inner}</g></svg>')
+  open("/tmp/pwa-icon-maskable.svg", "w").write(wrap(0.60))  # icon-192/512: safe-zone padded
+  open("/tmp/pwa-icon-apple.svg", "w").write(wrap(0.85))     # apple-touch-icon: fuller
   EOF
-  rsvg-convert -w 512 -h 512 /tmp/pwa-icon.svg -o public/icon-512.png
-  rsvg-convert -w 192 -h 192 /tmp/pwa-icon.svg -o public/icon-192.png
-  rsvg-convert -w 180 -h 180 /tmp/pwa-icon.svg -o public/apple-touch-icon.png
+  rsvg-convert -w 512 -h 512 /tmp/pwa-icon-maskable.svg -o public/icon-512.png
+  rsvg-convert -w 192 -h 192 /tmp/pwa-icon-maskable.svg -o public/icon-192.png
+  rsvg-convert -w 180 -h 180 /tmp/pwa-icon-apple.svg -o public/apple-touch-icon.png
   ```
-  `apple-touch-icon.png` (180×180, same art) is linked directly in
-  `index.html` since iOS doesn't read the web manifest for its home-screen
-  icon.
-- **Theme-color**: the manifest's `theme_color` is a single static fallback
-  (the OS splash screen, before any CSS loads). The browser-chrome tint
-  (address bar, task switcher) instead comes from `index.html`'s
+  `apple-touch-icon.png` is linked directly in `index.html` since iOS
+  doesn't read the web manifest for its home-screen icon.
+- **Theme-color**: `lib/themeColors.ts`'s `THEME_COLOR` is the shared source
+  for the manifest's `theme_color`/`background_color` (a single static
+  fallback used for the OS splash screen, before any CSS loads) and for
+  `store/theme.ts`. The actual browser-chrome tint (address bar, task
+  switcher) comes from `index.html`'s
   `<meta name="theme-color" id="theme-color-meta">`, whose `content` is kept
   in sync with the app's *resolved* theme — not bare `prefers-color-scheme`,
-  since `store/theme.ts`'s preference can override the system scheme — by
-  the pre-paint inline script (first paint) and `theme.ts`'s
-  `applyThemeClass` (every later change).
+  since the preference can override the system scheme — by the pre-paint
+  inline script (first paint, a hardcoded literal since it runs before any
+  module graph exists — keep it in sync by hand) and `theme.ts`'s
+  `applyThemeClass` (every later change, importing `THEME_COLOR`).
 - **Service worker**: `registerType: 'autoUpdate'`, `generateSW` mode, no
   `runtimeCaching` rules — the default precache-only strategy covers the
   app shell + static build assets (plus `includeAssets` for `favicon.svg`/
@@ -183,6 +192,14 @@ an offline-capable app shell (decision 9 in `PLAN.md`).
   disabled): a service worker serving a stale shell mid-development is a
   confusing failure mode, so `npm run dev` never registers one — only a
   production build (`npm run build && npm run preview`) does.
+  `injectRegister: false` — the plugin's own auto-injected registration
+  calls `window.location.reload()` unprompted the instant a new SW version
+  activates (including mid-session), which would silently discard whatever
+  the user was typing in the composer. `main.tsx` registers it manually via
+  `virtual:pwa-register` with a no-op `onNeedReload`: `skipWaiting`/
+  `clientsClaim` (baked into the generated SW for `autoUpdate`) still let a
+  new version take over in the background; the no-op just means it's served
+  starting next natural navigation instead of forced.
 - **Offline state**: `hooks/useOnlineStatus.ts` wraps `navigator.onLine` +
   the `online`/`offline` window events; `components/OfflineBanner.tsx`
   renders a fixed top banner off it, wired into `RootLayout.tsx` so it's

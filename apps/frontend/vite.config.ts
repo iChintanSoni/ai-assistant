@@ -3,6 +3,7 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { THEME_COLOR } from './src/lib/themeColors.js'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -23,7 +24,22 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // We register the SW ourselves (src/main.tsx) with a no-op onNeedReload
+      // instead of the plugin's auto-injected script: with registerType
+      // 'autoUpdate' and no onNeedReload, vite-plugin-pwa's default register
+      // logic calls `window.location.reload()` the instant a new SW version
+      // activates — including mid-session, silently discarding whatever the
+      // user was typing in the composer.
+      //
+      // injectRegister: false also turns off the plugin's own auto-set of
+      // workbox.skipWaiting/clientsClaim (it only sets those when
+      // injectRegister is 'auto'/unset — see its source), so they're set
+      // explicitly below instead: without them the new SW would sit in
+      // 'waiting' forever, since nothing else ever tells it to activate.
+      // skipWaiting/clientsClaim still let it take over network requests in
+      // the background as soon as it installs; the no-op onNeedReload only
+      // stops that from forcing a page reload.
+      injectRegister: false,
       // Deliberately omitted (defaults to disabled): a service worker
       // serving a stale shell mid-development is a confusing failure mode
       // (PLAN.md F3) — `npm run dev` must never register one. Only a
@@ -43,8 +59,8 @@ export default defineConfig({
         scope: '/',
         // Matches dark:bg-slate-950, the real app-shell background, so the
         // OS splash screen doesn't flash a different color before paint.
-        background_color: '#020617',
-        theme_color: '#020617',
+        background_color: THEME_COLOR.dark,
+        theme_color: THEME_COLOR.dark,
         icons: [
           // One safe-zone-padded design serves both purposes — avoids
           // maintaining two separate icon designs.
@@ -53,6 +69,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // See the injectRegister comment above: explicit because
+        // injectRegister: false skips the plugin's own auto-set of these.
+        skipWaiting: true,
+        clientsClaim: true,
         // No runtimeCaching entries: the default precache-only strategy
         // covers the app shell + static build assets. Never add a rule that
         // could cache the agent/file-storage API responses (PLAN.md F3) —

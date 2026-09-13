@@ -9,7 +9,11 @@ export function OfflineBanner({ isOnline }: { isOnline: boolean }) {
   return (
     <p
       role="status"
-      className="pointer-events-none absolute inset-x-0 top-[env(safe-area-inset-top)] z-30 mx-auto mt-2 w-fit rounded-full bg-rose-50 px-4 py-1.5 text-center text-sm text-rose-600 shadow-sm ring-1 ring-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:ring-rose-800/60"
+      // z-40, not z-30: HistoryPanel is also z-30 and can otherwise paint over
+      // this (it's later in RootLayout's DOM) at desktop widths where its
+      // md:left-20 md:w-80 box overlaps this banner's centered position — a
+      // network-down notice should never be hideable behind a flyout.
+      className="pointer-events-none absolute inset-x-0 top-[env(safe-area-inset-top)] z-40 mx-auto mt-2 w-fit rounded-full bg-rose-50 px-4 py-1.5 text-center text-sm text-rose-600 shadow-sm ring-1 ring-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:ring-rose-800/60"
     >
       You&apos;re offline — some features won&apos;t work until you reconnect.
     </p>
