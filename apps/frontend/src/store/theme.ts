@@ -19,8 +19,12 @@ function resolveTheme(preference: ThemePreference, prefersDark: boolean): Resolv
   return preference === "auto" ? (prefersDark ? "dark" : "light") : preference;
 }
 
+// Keep in sync with index.html's pre-paint script and #theme-color-meta tag.
+const THEME_COLOR: Record<ResolvedTheme, string> = { light: "#ffffff", dark: "#020617" };
+
 function applyThemeClass(resolved: ResolvedTheme) {
   document.documentElement.classList.toggle("dark", resolved === "dark");
+  document.getElementById("theme-color-meta")?.setAttribute("content", THEME_COLOR[resolved]);
 }
 
 interface ThemeState {

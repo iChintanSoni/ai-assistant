@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
+      The manifest's theme_color is a single static fallback (the OS splash
+      screen, before CSS loads). This tag is what actually tints the browser
+      chrome (address bar, task switcher) — its content is kept in sync with
+      the *resolved* theme (bg-white / dark:bg-slate-950), not just OS
+      prefers-color-scheme, since store/theme.ts's preference can override
+      the system scheme. Updated here (pre-paint) and by
+      store/theme.ts's applyThemeClass on every change.
+    -->
+    <meta name="theme-color" id="theme-color-meta" content="#020617" />
     <!--
       viewport-fit=cover            : without it every env(safe-area-inset-*) reads 0,
                                       and the bottom bar's padding collapses into the
@@ -25,6 +36,8 @@
             stored === 'dark' ||
             (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
           document.documentElement.classList.toggle('dark', isDark);
+          var meta = document.getElementById('theme-color-meta');
+          if (meta) meta.setAttribute('content', isDark ? '#020617' : '#ffffff');
         } catch (e) {}
       })();
     </script>

@@ -8,11 +8,13 @@ import { ClockIcon, Cog6ToothIcon, FolderIcon, PlusIcon } from "@heroicons/react
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { AuroraGlow } from "../components/AuroraGlow";
 import { HistoryPanel } from "../components/HistoryPanel";
+import { OfflineBanner } from "../components/OfflineBanner";
 import { useAttachments } from "../hooks/useAttachments";
 import { useBlockStrayFileDrops } from "../hooks/useBlockStrayFileDrops";
 import { useConversationUrlSync } from "../hooks/useConversationUrlSync";
 import { useFocusOnRouteChange } from "../hooks/useFocusOnRouteChange";
 import { useKeyboardInset } from "../hooks/useKeyboardInset";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { USER_NAME } from "../lib/config";
 import { fetchModels } from "../lib/models";
 import { routeViewFromPath } from "../lib/routeView";
@@ -52,6 +54,7 @@ export function RootLayout() {
   // already picked (and leak their object URLs, since nothing revokes them on
   // unmount). Handed to the chat view through the outlet.
   const attachments = useAttachments();
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     let active = true;
@@ -91,6 +94,7 @@ export function RootLayout() {
         Skip to content
       </a>
       <AuroraGlow />
+      <OfflineBanner isOnline={isOnline} />
       <Sidebar
         onNewChat={() => {
           newChat();
