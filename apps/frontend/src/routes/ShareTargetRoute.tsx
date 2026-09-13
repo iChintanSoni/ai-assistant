@@ -14,7 +14,7 @@ import { PageMain } from "./PageMain";
 export function ShareTargetRoute() {
   const { addFiles } = useOutletContext<AttachmentsContext>();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<"loading" | "empty">("loading");
+  const [status, setStatus] = useState<"loading" | "empty" | "error">("loading");
 
   // Runs once on mount, deliberately: takePendingShare() consumes the pending
   // share (a second call harmlessly returns []), so re-running this on an
@@ -22,14 +22,24 @@ export function ShareTargetRoute() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const files = await takePendingShare();
-      if (cancelled) return;
-      if (files.length === 0) {
-        setStatus("empty");
-        return;
+      try {
+        const files = await takePendingShare();
+        if (cancelled) return;
+        if (files.length === 0) {
+          setStatus("empty");
+          return;
+        }
+        addFiles(files);
+        navigate("/", { replace: true });
+      } catch (err) {
+        // IndexedDB can genuinely fail (quota, blocked, disabled in private
+        // browsing) — without this, a rejected promise here left the page
+        // stuck on "Adding your shared file…" forever, with no error
+        // boundary anywhere in the app to recover the user.
+        if (cancelled) return;
+        console.error("Failed to recover the shared file:", err);
+        setStatus("error");
       }
-      addFiles(files);
-      navigate("/", { replace: true });
     })();
     return () => {
       cancelled = true;
@@ -42,6 +52,13 @@ export function ShareTargetRoute() {
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
         {status === "loading" ? (
           <p className="text-lg text-slate-600 dark:text-slate-300">Adding your shared file…</p>
+        ) : status === "error" ? (
+          <>
+            <p className="text-lg text-slate-900 dark:text-slate-100">Couldn&apos;t add the shared file</p>
+            <p className="max-w-sm text-sm text-rose-500 dark:text-rose-400">
+              Something went wrong recovering it on this device. Try sharing it again.
+            </p>
+          </>
         ) : (
           <>
             <p className="text-lg text-slate-900 dark:text-slate-100">Nothing to add</p>

@@ -312,20 +312,29 @@ round-trip (a guarantee of real browser IndexedDB, not of this code) —
 content fidelity was instead verified live, in a real browser, per
 docs/frontend.md's share-target section.
 
-## Workbox route precedence for a POST-method "navigation"
+## Workbox routes are bucketed by HTTP method — registration order is a red herring
 
 A form POST to a URL — exactly what an OS share sheet, or any
 `<form method="post">`, produces — is *still* `request.mode === 'navigate'`
-to a service worker's `fetch` listener, same as an ordinary link click.
-Workbox's `NavigationRoute` (used for the SPA-shell fallback) matches on
-that `mode`, not on HTTP method, so a POST navigation would fall into it
-too unless something takes precedence first. **Fix**: the share-target
-`registerRoute` (matched on `method === 'POST'` explicitly) is registered
-*before* the `NavigationRoute` in `sw.ts` — workbox dispatches to the
-first registered route whose match succeeds, so order here is load-bearing,
-not stylistic. Verified live (not just reasoned about) by submitting a
-real multipart POST via a `<form>` + `DataTransfer`-attached `File` in the
-browser, since this exact ordering assumption is the kind of thing best
-confirmed empirically — see the `@a2a-js/sdk` v1 entries above for a
-matching case where a similar library-internals assumption turned out
-wrong on first read.
+to a service worker's `fetch` listener, same as an ordinary link click. The
+first version of this repo's `sw.ts` assumed that meant the share-target
+POST route had to be registered *before* the SPA-shell `NavigationRoute`,
+reasoning that workbox dispatches to "the first registered route whose
+match succeeds" and a POST navigation would otherwise fall into
+`NavigationRoute` too. A code-review pass caught that this explanation is
+wrong, confirmed by reading `workbox-routing`'s actual source
+(`node_modules/workbox-routing/src/{Route,NavigationRoute,Router}.ts`):
+`Route`'s constructor defaults `method` to `'GET'` unless given one
+explicitly; `NavigationRoute`'s constructor never passes a method, so it's
+always GET-only; and `Router.findMatchingRoute` looks requests up by
+`this._routes.get(request.method)` — a `Map` keyed by method, not a single
+ordered list. A POST request only ever consults the POST bucket; it can
+never reach a GET-bucketed route, and swapping the two `registerRoute`
+calls in `sw.ts` changes nothing. **The actual fix (unchanged) is simply
+declaring `"POST"` as the route's method** — that's what puts it in a
+different bucket than `NavigationRoute`; registration order between them
+is irrelevant. Lesson: a plausible-sounding mental model of a library's
+dispatch order is exactly the kind of claim to verify against the library's
+own source (or a targeted live test of the specific claim, not just "the
+feature works") before writing it into a comment — this one worked by
+accident of a *correct* fix paired with an *incorrect* explanation for why.

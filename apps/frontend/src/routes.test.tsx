@@ -308,3 +308,14 @@ test("/share-target with nothing pending shows an honest empty state instead of 
   expect(await screen.findByText(/nothing to add/i)).toBeInTheDocument();
   expect(uploadFile).not.toHaveBeenCalled();
 });
+
+test("/share-target recovers with an honest error state instead of hanging forever when takePendingShare rejects", async () => {
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.mocked(takePendingShare).mockRejectedValue(new Error("IndexedDB is disabled"));
+
+  renderAt(["/share-target"]);
+
+  expect(await screen.findByText(/couldn't add the shared file/i)).toBeInTheDocument();
+  expect(uploadFile).not.toHaveBeenCalled();
+  expect(logged).toHaveBeenCalled();
+});
