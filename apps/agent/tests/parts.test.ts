@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import type { Message, Part } from "@a2a-js/sdk";
+import { Role, type Message, type Part } from "@a2a-js/sdk";
 import {
   extractDocumentIds,
   extractModel,
@@ -10,12 +10,33 @@ import {
 
 function message(overrides: Partial<Message> = {}): Message {
   return {
-    kind: "message",
-    role: "user",
     messageId: "m1",
+    contextId: "",
+    taskId: "",
+    role: Role.ROLE_USER,
     parts: [],
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
     ...overrides,
   };
+}
+
+function textPart(text: string): Part {
+  return { content: { $case: "text", value: text }, metadata: undefined, filename: "", mediaType: "text/plain" };
+}
+
+function dataPart(data: unknown): Part {
+  return { content: { $case: "data", value: data }, metadata: undefined, filename: "", mediaType: "application/json" };
+}
+
+/** Inline file bytes, mirroring how a peer agent might send a file directly (this app's own uploads always use `urlFilePart`). */
+function rawFilePart(mediaType: string, base64: string): Part {
+  return { content: { $case: "raw", value: Buffer.from(base64, "base64") }, metadata: undefined, filename: "", mediaType };
+}
+
+function urlFilePart(mediaType: string, url: string): Part {
+  return { content: { $case: "url", value: url }, metadata: undefined, filename: "", mediaType };
 }
 
 test("extractModel reads metadata.model when it's a non-empty string", () => {
@@ -38,21 +59,17 @@ test("extractDocumentIds returns [] when metadata.documentIds is missing or not 
 });
 
 test("validateParts rejects an image part when the model can't see images", () => {
-  const parts: Part[] = [{ kind: "file", file: { mimeType: "image/png", bytes: "abc" } }];
+  const parts: Part[] = [rawFilePart("image/png", "abc")];
   expect(validateParts(parts, ["text"])).toMatch(/can't read images/);
 });
 
 test("validateParts rejects an audio part when the model can't hear audio", () => {
-  const parts: Part[] = [{ kind: "file", file: { mimeType: "audio/wav", bytes: "abc" } }];
+  const parts: Part[] = [rawFilePart("audio/wav", "abc")];
   expect(validateParts(parts, ["text", "image"])).toMatch(/can't process audio/);
 });
 
 test("validateParts allows image/audio parts when the model supports them, and ignores non-file parts", () => {
-  const parts: Part[] = [
-    { kind: "text", text: "hi" },
-    { kind: "file", file: { mimeType: "image/png", bytes: "abc" } },
-    { kind: "file", file: { mimeType: "audio/wav", bytes: "abc" } },
-  ];
+  const parts: Part[] = [textPart("hi"), rawFilePart("image/png", "abc"), rawFilePart("audio/wav", "abc")];
   expect(validateParts(parts, ["text", "image", "audio"])).toBeNull();
 });
 
@@ -66,12 +83,12 @@ test("prependNote unshifts a text block onto array content", () => {
 });
 
 test("toLangChainContent collapses a single text part to a plain string", async () => {
-  const parts: Part[] = [{ kind: "text", text: "hello" }];
+  const parts: Part[] = [textPart("hello")];
   await expect(toLangChainContent(parts)).resolves.toBe("hello");
 });
 
 test("toLangChainContent renders a lone data part as a fenced JSON block (collapsed to a plain string)", async () => {
-  const parts: Part[] = [{ kind: "data", data: { type: "decision", decisions: [{ type: "approve" }] } }];
+  const parts: Part[] = [dataPart({ type: "decision", decisions: [{ type: "approve" }] })];
   const result = await toLangChainContent(parts);
   expect(result).toBe(
     '```json\n' + JSON.stringify({ type: "decision", decisions: [{ type: "approve" }] }, null, 2) + '\n```',
@@ -79,37 +96,34 @@ test("toLangChainContent renders a lone data part as a fenced JSON block (collap
 });
 
 test("toLangChainContent keeps multiple blocks as an array instead of collapsing", async () => {
-  const parts: Part[] = [
-    { kind: "text", text: "hello" },
-    { kind: "data", data: { foo: "bar" } },
-  ];
+  const parts: Part[] = [textPart("hello"), dataPart({ foo: "bar" })];
   const result = await toLangChainContent(parts);
   expect(Array.isArray(result)).toBe(true);
   expect((result as { type: string }[]).map((b) => b.type)).toEqual(["text", "text"]);
 });
 
 test("toLangChainContent turns an image-only message into an image block", async () => {
-  const parts: Part[] = [{ kind: "file", file: { mimeType: "image/png", bytes: "QUJD" } }];
+  const parts: Part[] = [rawFilePart("image/png", "QUJD")];
   const result = await toLangChainContent(parts);
   expect(result).toEqual([{ type: "image_url", image_url: "data:image/png;base64,QUJD" }]);
 });
 
-test("toLangChainContent fetches a uri file part and inlines it as base64", async () => {
+test("toLangChainContent fetches a url file part and inlines it as base64", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(
       new Response(new Uint8Array([1, 2, 3]).buffer, { status: 200 }),
     ),
   );
-  const parts: Part[] = [{ kind: "file", file: { mimeType: "image/png", uri: "http://files/1.png" } }];
+  const parts: Part[] = [urlFilePart("image/png", "http://files/1.png")];
   const result = await toLangChainContent(parts);
   expect(result).toEqual([{ type: "image_url", image_url: `data:image/png;base64,${Buffer.from([1, 2, 3]).toString("base64")}` }]);
   vi.unstubAllGlobals();
 });
 
-test("toLangChainContent throws when fetching a uri file part fails", async () => {
+test("toLangChainContent throws when fetching a url file part fails", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
-  const parts: Part[] = [{ kind: "file", file: { mimeType: "image/png", uri: "http://files/missing.png" } }];
+  const parts: Part[] = [urlFilePart("image/png", "http://files/missing.png")];
   await expect(toLangChainContent(parts)).rejects.toThrow(/HTTP 404/);
   vi.unstubAllGlobals();
 });

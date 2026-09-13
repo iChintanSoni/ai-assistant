@@ -1,7 +1,7 @@
 /** DeepAgentExecutor: the A2A AgentExecutor that drives the deep agent (+ HITL). */
 import { Command } from "@langchain/langgraph";
 import type { AgentExecutor, ExecutionEventBus, RequestContext } from "@a2a-js/sdk/server";
-import type { Message } from "@a2a-js/sdk";
+import type { Message, Task } from "@a2a-js/sdk";
 import { A2APublisher } from "./publisher.js";
 import { runAgentToEvents, type HITLRequestValue, type TurnUsage } from "./streaming.js";
 import type { ApprovalRequest, Envelope } from "./envelope.js";
@@ -15,11 +15,11 @@ interface RunRecord {
   publisher: A2APublisher;
 }
 
-/** A resume/decision message carries a DataPart of this shape. */
+/** A resume/decision message carries a data-kind Part of this shape. */
 function extractDecisions(message: Message): unknown[] | null {
   for (const part of message.parts) {
-    if (part.kind === "data") {
-      const data = part.data as { type?: unknown; decisions?: unknown };
+    if (part.content?.$case === "data") {
+      const data = part.content.value as { type?: unknown; decisions?: unknown };
       if (data?.type === "decision" && Array.isArray(data.decisions)) return data.decisions;
     }
   }
@@ -78,9 +78,12 @@ export class DeepAgentExecutor implements AgentExecutor {
       const isResume = decisions !== null;
       const modelName = extractModel(userMessage) ?? getDefaultModel();
 
-      // For a fresh turn: validate the model + uploads, and open the task.
-      // For a resume: the task already exists and its thread state is checkpointed.
+      // Every execute() call — including a resume — must publish a task or
+      // message event as its very first event; the server rejects a stream
+      // that opens with a status-update. So the task goes out before any
+      // validation/failure path, not after.
       if (!isResume) {
+        publisher.startTask(userMessage);
         const model = await describeModel(modelName);
         if (!model.eligible) {
           publisher.failed(`Model "${modelName}" can't orchestrate: it doesn't support tool-calling.`);
@@ -91,7 +94,20 @@ export class DeepAgentExecutor implements AgentExecutor {
           publisher.failed(violation);
           return;
         }
-        publisher.startTask(userMessage);
+      } else {
+        // A resume's task already exists (its thread state is checkpointed);
+        // republish it to satisfy the same first-event requirement. If it's
+        // somehow missing (a malformed/foreign resume request with no
+        // matching stored task — this agent is a public A2A endpoint), fall
+        // back to a synthetic Task so the failure below still satisfies the
+        // ordering rule instead of violating it itself.
+        const task: Task =
+          ctx.task ?? { id: taskId, contextId, status: undefined, artifacts: [], history: [], metadata: undefined };
+        publisher.resumeTask(task);
+        if (!ctx.task) {
+          publisher.failed("Cannot resume: no task found for this request.");
+          return;
+        }
       }
 
       const agent = await buildAgent(modelName);

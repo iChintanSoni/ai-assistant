@@ -2,6 +2,16 @@
 import type { Message, Part } from "@a2a-js/sdk";
 import type { Modality } from "./models.js";
 
+/** Builds a text-kind Part. Shared by publisher.ts and a2aPeers.ts. */
+export function textPart(text: string): Part {
+  return { content: { $case: "text", value: text }, metadata: undefined, filename: "", mediaType: "text/plain" };
+}
+
+/** Builds a data-kind Part carrying an arbitrary JSON value. Shared by publisher.ts and a2aPeers.ts. */
+export function dataPart(data: unknown): Part {
+  return { content: { $case: "data", value: data }, metadata: undefined, filename: "", mediaType: "application/json" };
+}
+
 /** The selected model is passed per-message in metadata: { model: "<name>" }. */
 export function extractModel(message: Message): string | undefined {
   const model = message.metadata?.["model"];
@@ -21,14 +31,19 @@ function fileModality(mimeType: string | undefined): Modality | "other" {
   return "other";
 }
 
+/** A part carrying file content — either a URL reference or inline raw bytes. */
+function isFilePart(part: Part): boolean {
+  return part.content?.$case === "url" || part.content?.$case === "raw";
+}
+
 /**
  * Server-side upload gate: reject a file the selected model can't consume.
  * Returns an error string, or null if all parts are acceptable.
  */
 export function validateParts(parts: Part[], modalities: Modality[]): string | null {
   for (const part of parts) {
-    if (part.kind !== "file") continue;
-    const mime = part.file.mimeType ?? "";
+    if (!isFilePart(part)) continue;
+    const mime = part.mediaType || "";
     if (mime.startsWith("image/") && !modalities.includes("image")) {
       return "The selected model can't read images. Choose a vision-capable model or remove the image.";
     }
@@ -61,17 +76,17 @@ async function fetchAsBase64DataUrl(uri: string, mime: string): Promise<string> 
 export async function toLangChainContent(parts: Part[]): Promise<string | ContentBlock[]> {
   const blocks: ContentBlock[] = [];
   for (const part of parts) {
-    if (part.kind === "text") {
-      blocks.push({ type: "text", text: part.text });
-    } else if (part.kind === "data") {
-      blocks.push({ type: "text", text: "```json\n" + JSON.stringify(part.data, null, 2) + "\n```" });
-    } else if (part.kind === "file") {
-      const mime = part.file.mimeType ?? "application/octet-stream";
-      if ("bytes" in part.file) {
-        blocks.push({ type: "image_url", image_url: `data:${mime};base64,${part.file.bytes}` });
-      } else if ("uri" in part.file) {
-        blocks.push({ type: "image_url", image_url: await fetchAsBase64DataUrl(part.file.uri, mime) });
-      }
+    const content = part.content;
+    if (content?.$case === "text") {
+      blocks.push({ type: "text", text: content.value });
+    } else if (content?.$case === "data") {
+      blocks.push({ type: "text", text: "```json\n" + JSON.stringify(content.value, null, 2) + "\n```" });
+    } else if (content?.$case === "raw") {
+      const mime = part.mediaType || "application/octet-stream";
+      blocks.push({ type: "image_url", image_url: `data:${mime};base64,${content.value.toString("base64")}` });
+    } else if (content?.$case === "url") {
+      const mime = part.mediaType || "application/octet-stream";
+      blocks.push({ type: "image_url", image_url: await fetchAsBase64DataUrl(content.value, mime) });
     }
   }
   // Collapse to a plain string when it's a single text block (nicer for text models).

@@ -4,7 +4,8 @@ import { config } from "../src/config.js";
 
 test("buildAgentCard wires the A2A endpoint url from config.publicUrl", () => {
   const card = buildAgentCard();
-  expect(card.url).toBe(`${config.publicUrl}/a2a`);
+  expect(card.supportedInterfaces[0]!.url).toBe(`${config.publicUrl}/a2a`);
+  expect(card.supportedInterfaces[0]!.protocolBinding).toBe("JSONRPC");
 });
 
 test("buildAgentCard advertises streaming and the general-assistant skill", () => {

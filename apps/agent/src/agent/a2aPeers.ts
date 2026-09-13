@@ -13,8 +13,9 @@ import { randomUUID } from "node:crypto";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { ClientFactory } from "@a2a-js/sdk/client";
-import type { Message, Part, Task } from "@a2a-js/sdk";
+import { Role, TaskState, type Message, type Part, type Task } from "@a2a-js/sdk";
 import { config } from "../config.js";
+import { textPart } from "./parts.js";
 
 export interface A2APeer {
   /** Used to name its tool (delegate_to_<name>) — keep it a valid identifier fragment. */
@@ -30,27 +31,36 @@ function readPeers(): A2APeer[] {
 }
 
 function textFromParts(parts: Part[]): string {
-  return parts.map((p) => (p.kind === "text" ? p.text : "")).join("");
+  return parts.map((p) => (p.content?.$case === "text" ? p.content.value : "")).join("");
+}
+
+/** `SendMessageResult = Message | Task` — only Message has `messageId`. */
+function isMessage(result: Message | Task): result is Message {
+  return "messageId" in result;
 }
 
 async function delegate(peer: A2APeer, task: string): Promise<string> {
   const client = await new ClientFactory().createFromUrl(peer.url);
   const message: Message = {
-    kind: "message",
-    role: "user",
     messageId: randomUUID(),
-    parts: [{ kind: "text", text: task }],
+    contextId: "",
+    taskId: "",
+    role: Role.ROLE_USER,
+    parts: [textPart(task)],
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
   };
-  const result = await client.sendMessage({ message });
+  const result = await client.sendMessage({ tenant: "", message, configuration: undefined, metadata: undefined });
 
-  if (result.kind === "message") return textFromParts(result.parts) || "(empty reply)";
+  if (isMessage(result)) return textFromParts(result.parts) || "(empty reply)";
 
   // Otherwise it's a Task — mirrors the status-update text extraction the
   // frontend does in useChat.ts's handleEvent.
-  const status = (result as Task).status;
-  const text = textFromParts(status.message?.parts ?? []);
-  if (status.state !== "completed" && !text) {
-    return `Peer agent "${peer.name}" did not return a completed result (state: ${status.state}). It may require human approval on its own end, which this orchestrator cannot resolve on its behalf.`;
+  const status = result.status;
+  const text = textFromParts(status?.message?.parts ?? []);
+  if (status?.state !== TaskState.TASK_STATE_COMPLETED && !text) {
+    return `Peer agent "${peer.name}" did not return a completed result (state: ${status ? TaskState[status.state] : "unknown"}). It may require human approval on its own end, which this orchestrator cannot resolve on its behalf.`;
   }
   return text || "(empty reply)";
 }

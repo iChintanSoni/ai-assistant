@@ -91,8 +91,8 @@ see the **envelope** section in [agent.md](agent.md).
    `runAgentToEvents` (`apps/agent/src/server/streaming.ts`), which drives
    the LangGraph deep agent turn-by-turn.
 3. Each incremental model/tool event is translated into an **envelope**
-   (`apps/agent/src/server/envelope.ts`) and published as a `DataPart` inside
-   a `TaskStatusUpdateEvent`.
+   (`apps/agent/src/server/envelope.ts`) and published as a `data`-kind
+   `Part` inside a `TaskStatusUpdateEvent`.
 4. If the agent calls a risky tool — the built-in `RISKY_TOOLS`
    (`send_email`, `run_javascript`, `generate_image`) plus any MCP server's
    declared `riskyTools` (e.g. every `apps/mcp-authoring` tool) — the turn

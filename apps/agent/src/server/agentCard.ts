@@ -3,30 +3,43 @@ import type { AgentCard } from "@a2a-js/sdk";
 import { config } from "../config.js";
 
 export function buildAgentCard(): AgentCard {
+  const defaultInputModes = [
+    "text/plain",
+    "application/json",
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "audio/wav",
+    "audio/mpeg",
+  ];
+  const defaultOutputModes = ["text/plain", "application/json"];
+
   return {
-    protocolVersion: "0.3.0",
     name: "Aurora Assistant",
     description:
       "A general-purpose local assistant powered by Ollama + Deep Agents, speaking A2A.",
-    url: `${config.publicUrl}/a2a`,
-    preferredTransport: "JSONRPC",
+    supportedInterfaces: [
+      {
+        url: `${config.publicUrl}/a2a`,
+        protocolBinding: "JSONRPC",
+        tenant: "",
+        protocolVersion: "1.0",
+      },
+    ],
+    provider: undefined,
     version: "0.1.0",
+    documentationUrl: undefined,
     capabilities: {
       streaming: true,
       pushNotifications: false,
-      stateTransitionHistory: false,
+      extensions: [],
+      extendedAgentCard: false,
     },
+    securitySchemes: {},
+    securityRequirements: [],
     // Superset the agent can accept; per-request gating is enforced by the model.
-    defaultInputModes: [
-      "text/plain",
-      "application/json",
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-      "audio/wav",
-      "audio/mpeg",
-    ],
-    defaultOutputModes: ["text/plain", "application/json"],
+    defaultInputModes,
+    defaultOutputModes,
     skills: [
       {
         id: "general-assistant",
@@ -39,7 +52,12 @@ export function buildAgentCard(): AgentCard {
           "Give me a random number between 1 and 100.",
           "Summarize this and list three takeaways.",
         ],
+        inputModes: defaultInputModes,
+        outputModes: defaultOutputModes,
+        securityRequirements: [],
       },
     ],
+    signatures: [],
+    iconUrl: undefined,
   };
 }

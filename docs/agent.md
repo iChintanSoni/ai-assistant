@@ -55,7 +55,7 @@ A2A has no native concept of "thinking text," "tool call," or "subagent
 delegation" events — only task state transitions and message/artifact parts.
 The agent layers its own protocol on top: `src/server/streaming.ts` drives the
 LangGraph agent turn and, for every intermediate event, emits **one
-`Envelope`** (`src/server/envelope.ts`) as a `DataPart` inside an A2A
+`Envelope`** (`src/server/envelope.ts`) as a `data`-kind `Part` inside an A2A
 `TaskStatusUpdateEvent`.
 
 ```ts
@@ -88,7 +88,7 @@ Finished, addressable outputs (as opposed to incremental deltas) use A2A's
    envelope and publishes the task as A2A `input-required`
    (`publisher.inputRequired(...)`).
 3. The frontend renders the pending approval(s) and, on a user decision,
-   sends a new message on the **same** `taskId` carrying a `DataPart`:
+   sends a new message on the **same** `taskId` carrying a `data`-kind `Part`:
    `{ type: "decision", decisions: [...] }`.
 4. `executor.ts`'s `extractDecisions` recognizes this shape and resumes the
    graph via `new Command({ resume: { decisions } })` against the
