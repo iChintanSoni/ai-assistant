@@ -80,7 +80,8 @@ cp apps/frontend/.env.example apps/frontend/.env
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PORT` | `4000` | Port the A2A server listens on. |
-| `PUBLIC_URL` | `http://localhost:PORT` | Public base URL advertised in the AgentCard. |
+| `HOST` | `0.0.0.0` | Bind address. `127.0.0.1` keeps the agent off the network — it has no auth, see [Security](#security). |
+| `PUBLIC_URL` | `http://localhost:PORT` | Public base URL advertised in the AgentCard. The A2A client connects to whatever this says — see [Using it from your phone](#using-it-from-your-phone). |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama server. |
 | `DEFAULT_MODEL` | `gemma4:12b` | Default orchestrator model (must support tool-calling). |
 | `DATA_DIR` | `./data` | Where checkpoints, history, documents, and memories live. |
@@ -114,15 +115,15 @@ cp apps/frontend/.env.example apps/frontend/.env
 | `PORT` | `6060` | Port. |
 | `STORAGE_DIR` | `./.storage` | Where uploaded/generated file bytes are stored. |
 | `DB_PATH` | `./file-storage.db` | SQLite metadata (verified mimetype, size, original name). |
-| `BASE_URL` | `http://localhost:PORT` | Public base URL used to build download links returned by `/upload`. |
+| `BASE_URL` | `http://localhost:PORT` | Public base URL used to build download links returned by `/upload`. Stored in saved transcripts — see [Using it from your phone](#using-it-from-your-phone). |
 | `CORS_ORIGIN` | `*` | Comma-separated allowed origins; set explicitly in production. |
 
 ### `apps/frontend/.env`
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `VITE_AGENT_URL` | `http://localhost:4000` | The A2A agent server. |
-| `VITE_FILE_STORAGE_URL` | `http://localhost:6060` | The file-storage service. |
+| `VITE_AGENT_URL` | same host as the page, port 4000 | The A2A agent server. Defaults to the host you loaded the UI from, so LAN/phone access needs no setting here. |
+| `VITE_FILE_STORAGE_URL` | same host as the page, port 6060 | The file-storage service. Same derivation. |
 
 ## Running
 
@@ -137,11 +138,93 @@ in one terminal. Individually:
 
 ```
 npm run dev:agent   # apps/agent, :4000, tsx --watch
-npm run dev:web      # apps/frontend, :5173, vite
+npm run dev:web      # apps/frontend, :5173, vite (localhost only)
 npm run dev:files    # apps/file-storage, :6060, tsx --watch
 ```
 
+To reach it from another device, use `npm run dev:lan` instead — see
+[Using it from your phone](#using-it-from-your-phone).
+
 Then open `http://localhost:5173`.
+
+## Using it from your phone
+
+The UI is mobile-first, but `npm run dev` binds the frontend to localhost only, so
+nothing else on the network can load it. Use the LAN variant instead:
+
+```
+npm run dev:lan
+```
+
+That's the only difference — it runs the frontend with `vite --host`; the agent and
+file-storage already listen on every interface.
+
+You also have to tell the two services what to call themselves, because both hand
+out **absolute** URLs that the browser then fetches:
+
+| Var | File | Why it matters |
+| --- | --- | --- |
+| `PUBLIC_URL` | `apps/agent/.env` | The agent card advertises this, and the A2A client connects to whatever it says. Left as `localhost`, the phone tries to reach *itself* and every message fails. |
+| `BASE_URL` | `apps/file-storage/.env` | Every stored file URL. Left as `localhost`, images and generated documents won't load on the phone. |
+
+**Use your machine's name, not its IP.** macOS publishes `<hostname>.local` over
+Bonjour, which resolves from both the laptop and the phone:
+
+```
+# apps/agent/.env
+PUBLIC_URL=http://my-macbook.local:4000
+# apps/file-storage/.env
+BASE_URL=http://my-macbook.local:6060
+```
+
+`hostname` prints yours. Vite normally rejects a `Host` header that isn't
+localhost or an IP; `apps/frontend/vite.config.ts` sets `allowedHosts: true` so
+any name — `.local`, a router-assigned hostname, Tailscale MagicDNS, ngrok —
+works without a source edit. That's fine here specifically because this is a
+single-user tool with no authentication regardless (see Security below).
+
+An IP works too, but file URLs are stored in saved
+transcripts — so a conversation recorded against `192.168.1.5` renders broken once
+DHCP moves you, and one recorded against `localhost` never renders on the phone at
+all. The `.local` name is stable and works from either machine.
+
+The frontend needs no configuration: it derives the agent and file-storage hosts
+from whatever address you loaded the page at (`lib/config.ts`), so browsing to
+`http://my-macbook.local:5173` from the phone just works. `VITE_AGENT_URL` /
+`VITE_FILE_STORAGE_URL` still override if the services live elsewhere.
+
+### What won't work over the LAN
+
+`http://` on anything other than `localhost` is not a **secure context**, so the
+browser withholds two APIs:
+
+- **Voice input** — `navigator.mediaDevices` is undefined, so the mic button fails.
+- **Copy buttons** — `navigator.clipboard` is undefined.
+
+Everything else — chat, streaming, approvals, History, Files, Settings, uploads —
+works normally. Fixing these needs HTTPS across all three services, which isn't
+set up.
+
+`crypto.randomUUID` is gated the same way and *did* break sending outright until
+`lib/uuid.ts` added a fallback — see [gotchas.md](gotchas.md). Worth remembering if
+you add anything else that assumes a secure context.
+
+### Security
+
+Worth knowing, and it is **not** specific to `dev:lan`: the agent has **no
+authentication**, its CORS policy allows every origin, and it has always bound
+every network interface. Anyone who can reach port 4000 can use it — including
+running code in the sandbox, reading your uploaded documents, and deleting
+conversations. `dev:lan` only adds the UI to what's already reachable.
+
+On a network you don't control, keep it to the machine:
+
+```
+# apps/agent/.env
+HOST=127.0.0.1
+# apps/file-storage/.env
+HOST=127.0.0.1
+```
 
 ## Type checking and tests
 

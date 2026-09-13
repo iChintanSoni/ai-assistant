@@ -14,6 +14,7 @@ import { isEnvelope, type Decision } from "../lib/envelope";
 import { saveConversation } from "../lib/history";
 import { uploadFile } from "../lib/upload";
 import { useChatStore, type UIAttachment } from "../store/chat";
+import { randomUUID } from "../lib/uuid";
 
 type A2AEvent = Task | Message | TaskStatusUpdateEvent | TaskArtifactUpdateEvent;
 
@@ -116,7 +117,7 @@ export function useChat() {
     void streamMessage({
       kind: "message",
       role: "user",
-      messageId: crypto.randomUUID(),
+      messageId: randomUUID(),
       parts,
       metadata: {
         model,
@@ -137,7 +138,7 @@ export function useChat() {
     await streamMessage({
       kind: "message",
       role: "user",
-      messageId: crypto.randomUUID(),
+      messageId: randomUUID(),
       taskId,
       parts: [{ kind: "data", data: { type: "decision", decisions } }],
       metadata: { model },

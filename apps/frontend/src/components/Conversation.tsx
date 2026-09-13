@@ -563,21 +563,31 @@ function AttachmentChip({ name, href, mimeType }: { name: string; href?: string;
 }
 
 function CopyButton({ text, label = "response" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   return (
     <button
       type="button"
       onClick={async () => {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        try {
+          await navigator.clipboard.writeText(text);
+          setStatus("copied");
+        } catch (err) {
+          // navigator.clipboard is undefined outside a secure context — e.g. the
+          // app reached over plain http on the LAN (see docs/setup.md). Without
+          // this catch the click silently did nothing, which gave no sign the
+          // origin was the problem, the exact failure mode called out for
+          // randomUUID in docs/gotchas.md.
+          console.error("Copy failed:", err);
+          setStatus("failed");
+        }
+        setTimeout(() => setStatus("idle"), 1500);
       }}
-      aria-label={copied ? "Copied" : `Copy ${label}`}
+      aria-label={status === "copied" ? "Copied" : status === "failed" ? "Copy failed" : `Copy ${label}`}
       className="flex min-h-10 w-fit items-center gap-1 rounded text-xs font-medium text-slate-500 transition-colors hover:text-slate-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 pointer-coarse:min-h-11 dark:text-slate-400 dark:hover:text-slate-200"
     >
-      {copied ? <CheckIcon className="size-3.5" /> : <ClipboardDocumentIcon className="size-3.5" />}
-      <span>{copied ? "Copied" : "Copy"}</span>
+      {status === "copied" ? <CheckIcon className="size-3.5" /> : <ClipboardDocumentIcon className="size-3.5" />}
+      <span>{status === "copied" ? "Copied" : status === "failed" ? "Copy failed" : "Copy"}</span>
     </button>
   );
 }

@@ -147,6 +147,21 @@ test("agent copy button copies the raw markdown text to the clipboard", async ()
   await expect(navigator.clipboard.readText()).resolves.toBe("**bold answer**");
 });
 
+test("a copy failure (e.g. an insecure origin, where navigator.clipboard is undefined) is surfaced, not silent", async () => {
+  useChatStore.setState({ turns: [agentTurn({ status: "complete", text: "answer" })] });
+  const user = userEvent.setup();
+  const failure = new TypeError("navigator.clipboard is undefined");
+  vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(failure);
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  render(<Conversation />);
+  await user.click(screen.getByRole("button", { name: /copy response/i }));
+
+  expect(await screen.findByRole("button", { name: "Copy failed" })).toBeInTheDocument();
+  expect(logged).toHaveBeenCalledWith("Copy failed:", failure);
+  logged.mockRestore();
+});
+
 test("user turn shows a copy button that copies exactly the typed text, not markdown-rendered", async () => {
   useChatStore.setState({ turns: [userTurn({ text: "**not bold**, just typed" })] });
   const user = userEvent.setup();
