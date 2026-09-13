@@ -2,6 +2,16 @@
 import type { Message, Part } from "@a2a-js/sdk";
 import type { Modality } from "./models.js";
 
+/** Builds a text-kind Part. Shared by publisher.ts and a2aPeers.ts. */
+export function textPart(text: string): Part {
+  return { content: { $case: "text", value: text }, metadata: undefined, filename: "", mediaType: "text/plain" };
+}
+
+/** Builds a data-kind Part carrying an arbitrary JSON value. Shared by publisher.ts and a2aPeers.ts. */
+export function dataPart(data: unknown): Part {
+  return { content: { $case: "data", value: data }, metadata: undefined, filename: "", mediaType: "application/json" };
+}
+
 /** The selected model is passed per-message in metadata: { model: "<name>" }. */
 export function extractModel(message: Message): string | undefined {
   const model = message.metadata?.["model"];

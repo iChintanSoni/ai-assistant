@@ -15,6 +15,7 @@ import { z } from "zod";
 import { ClientFactory } from "@a2a-js/sdk/client";
 import { Role, TaskState, type Message, type Part, type Task } from "@a2a-js/sdk";
 import { config } from "../config.js";
+import { textPart } from "./parts.js";
 
 export interface A2APeer {
   /** Used to name its tool (delegate_to_<name>) — keep it a valid identifier fragment. */
@@ -45,7 +46,7 @@ async function delegate(peer: A2APeer, task: string): Promise<string> {
     contextId: "",
     taskId: "",
     role: Role.ROLE_USER,
-    parts: [{ content: { $case: "text", value: task }, metadata: undefined, filename: "", mediaType: "text/plain" }],
+    parts: [textPart(task)],
     metadata: undefined,
     extensions: [],
     referenceTaskIds: [],

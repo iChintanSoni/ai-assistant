@@ -2,15 +2,8 @@
 import { randomUUID } from "node:crypto";
 import { AgentEvent, type ExecutionEventBus } from "@a2a-js/sdk/server";
 import { Role, TaskState, type Message, type Part, type Task, type TaskStatusUpdateEvent } from "@a2a-js/sdk";
+import { dataPart, textPart } from "../agent/parts.js";
 import type { Envelope } from "./envelope.js";
-
-function textPart(text: string): Part {
-  return { content: { $case: "text", value: text }, metadata: undefined, filename: "", mediaType: "text/plain" };
-}
-
-function dataPart(data: unknown): Part {
-  return { content: { $case: "data", value: data }, metadata: undefined, filename: "", mediaType: "application/json" };
-}
 
 export class A2APublisher {
   private settled = false;

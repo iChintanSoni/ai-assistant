@@ -242,15 +242,20 @@ test("a resume turn (decision message) skips model/part validation, republishes 
   expect(completeSpy).toHaveBeenCalledWith("resumed answer");
 });
 
-test("a resume without a matching stored task fails instead of silently proceeding", async () => {
+test("a resume without a matching stored task still opens with a task event, then fails instead of silently proceeding", async () => {
   const executor = new DeepAgentExecutor();
   const resumeMessage = textMessage("", {
     parts: [{ content: { $case: "data", value: { type: "decision", decisions: [{ type: "approve" }] } }, metadata: undefined, filename: "", mediaType: "application/json" }],
   });
+  const bus = fakeBus();
 
-  await executor.execute(ctx(resumeMessage, "task-1", "ctx-1", undefined), fakeBus());
+  await executor.execute(ctx(resumeMessage, "task-1", "ctx-1", undefined), bus);
 
-  expect(resumeTaskSpy).not.toHaveBeenCalled();
+  // Even this failure path must satisfy the server's first-event ordering rule.
+  expect(resumeTaskSpy).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1", contextId: "ctx-1" }));
+  const [first, second] = bus.publish.mock.calls.map((call) => call[0] as { kind: string });
+  expect(first!.kind).toBe("task");
+  expect(second!.kind).toBe("statusUpdate");
   expect(failedSpy).toHaveBeenCalledWith(expect.stringMatching(/no task found/i));
   expect(runAgentToEvents).not.toHaveBeenCalled();
 });
