@@ -18,8 +18,8 @@ interface RunRecord {
 /** A resume/decision message carries a DataPart of this shape. */
 function extractDecisions(message: Message): unknown[] | null {
   for (const part of message.parts) {
-    if (part.kind === "data") {
-      const data = part.data as { type?: unknown; decisions?: unknown };
+    if (part.content?.$case === "data") {
+      const data = part.content.value as { type?: unknown; decisions?: unknown };
       if (data?.type === "decision" && Array.isArray(data.decisions)) return data.decisions;
     }
   }
@@ -78,9 +78,12 @@ export class DeepAgentExecutor implements AgentExecutor {
       const isResume = decisions !== null;
       const modelName = extractModel(userMessage) ?? getDefaultModel();
 
-      // For a fresh turn: validate the model + uploads, and open the task.
-      // For a resume: the task already exists and its thread state is checkpointed.
+      // Every execute() call — including a resume — must publish a task or
+      // message event as its very first event; the server rejects a stream
+      // that opens with a status-update. So the task goes out before any
+      // validation/failure path, not after.
       if (!isResume) {
+        publisher.startTask(userMessage);
         const model = await describeModel(modelName);
         if (!model.eligible) {
           publisher.failed(`Model "${modelName}" can't orchestrate: it doesn't support tool-calling.`);
@@ -91,7 +94,14 @@ export class DeepAgentExecutor implements AgentExecutor {
           publisher.failed(violation);
           return;
         }
-        publisher.startTask(userMessage);
+      } else {
+        // A resume's task already exists (its thread state is checkpointed);
+        // republish it to satisfy the same first-event requirement.
+        if (!ctx.task) {
+          publisher.failed("Cannot resume: no task found for this request.");
+          return;
+        }
+        publisher.resumeTask(ctx.task);
       }
 
       const agent = await buildAgent(modelName);

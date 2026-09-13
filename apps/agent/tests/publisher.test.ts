@@ -1,13 +1,22 @@
 import { beforeEach, expect, test, vi } from "vitest";
 import type { ExecutionEventBus } from "@a2a-js/sdk/server";
-import type { Message, Task, TaskStatusUpdateEvent } from "@a2a-js/sdk";
+import { Role, TaskState, type Message, type Task, type TaskStatusUpdateEvent } from "@a2a-js/sdk";
 import { A2APublisher } from "../src/server/publisher.js";
 
 function fakeBus(): ExecutionEventBus & { publish: ReturnType<typeof vi.fn>; finished: ReturnType<typeof vi.fn> } {
   return { publish: vi.fn(), finished: vi.fn() } as never;
 }
 
-const userMessage: Message = { kind: "message", role: "user", messageId: "m1", parts: [{ kind: "text", text: "hi" }] };
+const userMessage: Message = {
+  messageId: "m1",
+  contextId: "",
+  taskId: "",
+  role: Role.ROLE_USER,
+  parts: [{ content: { $case: "text", value: "hi" }, metadata: undefined, filename: "", mediaType: "text/plain" }],
+  metadata: undefined,
+  extensions: [],
+  referenceTaskIds: [],
+};
 
 let bus: ReturnType<typeof fakeBus>;
 let publisher: A2APublisher;
@@ -21,19 +30,42 @@ test("startTask publishes a submitted Task carrying the user's message in histor
   publisher.startTask(userMessage);
 
   expect(bus.publish).toHaveBeenCalledTimes(1);
-  const task = bus.publish.mock.calls[0]![0] as Task;
-  expect(task).toMatchObject({ kind: "task", id: "task-1", contextId: "ctx-1", history: [userMessage] });
-  expect(task.status.state).toBe("submitted");
+  const event = bus.publish.mock.calls[0]![0] as { kind: string; data: Task };
+  expect(event.kind).toBe("task");
+  expect(event.data).toMatchObject({ id: "task-1", contextId: "ctx-1", history: [userMessage] });
+  expect(event.data.status?.state).toBe(TaskState.TASK_STATE_SUBMITTED);
 });
 
-test("emit publishes a non-final working status-update wrapping the envelope as a data part", () => {
+test("resumeTask republishes the given Task as-is (the first event a resumed stream requires)", () => {
+  const existing: Task = {
+    id: "task-1",
+    contextId: "ctx-1",
+    status: { state: TaskState.TASK_STATE_WORKING, message: undefined, timestamp: "t" },
+    artifacts: [],
+    history: [userMessage],
+    metadata: undefined,
+  };
+
+  publisher.resumeTask(existing);
+
+  expect(bus.publish).toHaveBeenCalledTimes(1);
+  const event = bus.publish.mock.calls[0]![0] as { kind: string; data: Task };
+  expect(event.kind).toBe("task");
+  expect(event.data).toBe(existing);
+});
+
+test("emit publishes a working status-update wrapping the envelope as a data part", () => {
   publisher.emit({ v: 1, type: "text", delta: "hi" });
 
-  const event = bus.publish.mock.calls[0]![0] as TaskStatusUpdateEvent;
-  expect(event.kind).toBe("status-update");
-  expect(event.status.state).toBe("working");
-  expect(event.final).toBe(false);
-  expect(event.status.message?.parts[0]).toEqual({ kind: "data", data: { v: 1, type: "text", delta: "hi" } });
+  const event = bus.publish.mock.calls[0]![0] as { kind: string; data: TaskStatusUpdateEvent };
+  expect(event.kind).toBe("statusUpdate");
+  expect(event.data.status?.state).toBe(TaskState.TASK_STATE_WORKING);
+  expect(event.data.status?.message?.parts[0]).toEqual({
+    content: { $case: "data", value: { v: 1, type: "text", delta: "hi" } },
+    metadata: undefined,
+    filename: "",
+    mediaType: "application/json",
+  });
 });
 
 test("emit is a no-op once the publisher has settled", () => {
@@ -45,13 +77,17 @@ test("emit is a no-op once the publisher has settled", () => {
   expect(bus.publish).not.toHaveBeenCalled();
 });
 
-test("complete publishes a final completed status with the text, and calls finished()", () => {
+test("complete publishes a completed status with the text, and calls finished()", () => {
   publisher.complete("final answer");
 
-  const event = bus.publish.mock.calls[0]![0] as TaskStatusUpdateEvent;
-  expect(event.status.state).toBe("completed");
-  expect(event.final).toBe(true);
-  expect(event.status.message?.parts[0]).toEqual({ kind: "text", text: "final answer" });
+  const event = bus.publish.mock.calls[0]![0] as { kind: string; data: TaskStatusUpdateEvent };
+  expect(event.data.status?.state).toBe(TaskState.TASK_STATE_COMPLETED);
+  expect(event.data.status?.message?.parts[0]).toEqual({
+    content: { $case: "text", value: "final answer" },
+    metadata: undefined,
+    filename: "",
+    mediaType: "text/plain",
+  });
   expect(bus.finished).toHaveBeenCalledTimes(1);
   expect(publisher.isSettled).toBe(true);
 });
@@ -64,33 +100,40 @@ test("complete is idempotent", () => {
   expect(bus.finished).toHaveBeenCalledTimes(1);
 });
 
-test("inputRequired publishes a final input-required status carrying the approval envelope", () => {
+test("inputRequired publishes an input-required status carrying the approval envelope", () => {
   publisher.inputRequired({ v: 1, type: "approval", requests: [] });
 
-  const event = bus.publish.mock.calls[0]![0] as TaskStatusUpdateEvent;
-  expect(event.status.state).toBe("input-required");
-  expect(event.final).toBe(true);
-  expect(event.status.message?.parts[0]).toEqual({ kind: "data", data: { v: 1, type: "approval", requests: [] } });
+  const event = bus.publish.mock.calls[0]![0] as { kind: string; data: TaskStatusUpdateEvent };
+  expect(event.data.status?.state).toBe(TaskState.TASK_STATE_INPUT_REQUIRED);
+  expect(event.data.status?.message?.parts[0]).toEqual({
+    content: { $case: "data", value: { v: 1, type: "approval", requests: [] } },
+    metadata: undefined,
+    filename: "",
+    mediaType: "application/json",
+  });
   expect(bus.finished).toHaveBeenCalledTimes(1);
 });
 
-test("canceled publishes a final canceled status with no message", () => {
+test("canceled publishes a canceled status with no message", () => {
   publisher.canceled();
 
-  const event = bus.publish.mock.calls[0]![0] as TaskStatusUpdateEvent;
-  expect(event.status.state).toBe("canceled");
-  expect(event.final).toBe(true);
-  expect(event.status.message).toBeUndefined();
+  const event = bus.publish.mock.calls[0]![0] as { kind: string; data: TaskStatusUpdateEvent };
+  expect(event.data.status?.state).toBe(TaskState.TASK_STATE_CANCELED);
+  expect(event.data.status?.message).toBeUndefined();
   expect(bus.finished).toHaveBeenCalledTimes(1);
 });
 
-test("failed publishes a final failed status with the error message as text", () => {
+test("failed publishes a failed status with the error message as text", () => {
   publisher.failed("boom");
 
-  const event = bus.publish.mock.calls[0]![0] as TaskStatusUpdateEvent;
-  expect(event.status.state).toBe("failed");
-  expect(event.final).toBe(true);
-  expect(event.status.message?.parts[0]).toEqual({ kind: "text", text: "boom" });
+  const event = bus.publish.mock.calls[0]![0] as { kind: string; data: TaskStatusUpdateEvent };
+  expect(event.data.status?.state).toBe(TaskState.TASK_STATE_FAILED);
+  expect(event.data.status?.message?.parts[0]).toEqual({
+    content: { $case: "text", value: "boom" },
+    metadata: undefined,
+    filename: "",
+    mediaType: "text/plain",
+  });
 });
 
 test("terminal methods are mutually idempotent: whichever settles first wins", () => {

@@ -77,7 +77,7 @@ envelopes stream in — `applyEnvelope` is the single reducer for every
   the response via `client.sendMessageStream`, dispatching each event into
   the store.
 - `respond(decisions)` resumes a paused (HITL `input-required`) task by
-  sending a `{ type: "decision", decisions }` `DataPart` on the same
+  sending a `{ type: "decision", decisions }` `data`-kind `Part` on the same
   `taskId`.
 - `stop()` calls A2A's `tasks/cancel`.
 - After every turn settles (success or failure), `persistConversation()`
@@ -114,8 +114,8 @@ documents-active-in-conversation + staged attachments combined.
 ## Streaming envelope decoding — `lib/envelope.ts`
 
 Mirrors the agent's `Envelope` type (`isEnvelope` type guard) so
-`useChat.ts` can safely narrow A2A `DataPart.data` before dispatching it to
-the store.
+`useChat.ts` can safely narrow a `data`-kind A2A `Part`'s content before
+dispatching it to the store.
 
 ## Other `lib/` modules
 

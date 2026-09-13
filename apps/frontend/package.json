@@ -14,7 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@a2a-js/sdk": "^0.3",
+    "@a2a-js/sdk": "^1",
     "@heroicons/react": "^2",
     "@tailwindcss/vite": "^4",
     "mermaid": "^11.16.0",

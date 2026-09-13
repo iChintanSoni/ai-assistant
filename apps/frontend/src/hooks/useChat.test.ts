@@ -5,7 +5,7 @@ vi.mock("../lib/a2a", () => ({ getClient: vi.fn() }));
 vi.mock("../lib/upload", () => ({ uploadFile: vi.fn() }));
 vi.mock("../lib/history", () => ({ saveConversation: vi.fn() }));
 
-import type { Message } from "@a2a-js/sdk";
+import { Role, TaskState, type Message, type Part, type StreamResponse, type Task, type TaskStatus } from "@a2a-js/sdk";
 import { getClient } from "../lib/a2a";
 import { uploadFile } from "../lib/upload";
 import { saveConversation } from "../lib/history";
@@ -19,11 +19,50 @@ function asyncEvents<T>(events: T[]) {
   })();
 }
 
-function fakeClient(events: unknown[] = []) {
+function fakeClient(events: StreamResponse[] = []) {
   return {
     sendMessageStream: vi.fn((_args: { message: Message }) => asyncEvents(events)),
     cancelTask: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+function textPart(text: string): Part {
+  return { content: { $case: "text", value: text }, metadata: undefined, filename: "", mediaType: "text/plain" };
+}
+
+function dataPart(data: unknown): Part {
+  return { content: { $case: "data", value: data }, metadata: undefined, filename: "", mediaType: "application/json" };
+}
+
+function agentMessage(parts: Part[]): Message {
+  return {
+    messageId: "a1",
+    contextId: "",
+    taskId: "",
+    role: Role.ROLE_AGENT,
+    parts,
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
+  };
+}
+
+function taskEvent(id: string, contextId: string): StreamResponse {
+  const task: Task = { id, contextId, status: undefined, artifacts: [], history: [], metadata: undefined };
+  return { payload: { $case: "task", value: task } };
+}
+
+function statusEvent(status: TaskStatus): StreamResponse {
+  return {
+    payload: {
+      $case: "statusUpdate",
+      value: { taskId: "t1", contextId: "c1", status, metadata: undefined },
+    },
+  };
+}
+
+function messageEvent(parts: Part[]): StreamResponse {
+  return { payload: { $case: "message", value: agentMessage(parts) } };
 }
 
 function model(): ModelInfo {
@@ -72,7 +111,7 @@ test("send() does nothing for blank text with no files", async () => {
 });
 
 test("send() begins the turn and streams a text message to the agent", async () => {
-  const client = fakeClient([{ kind: "message", role: "agent", messageId: "a1", parts: [{ kind: "text", text: "hi back" }] }]);
+  const client = fakeClient([messageEvent([textPart("hi back")])]);
   vi.mocked(getClient).mockResolvedValue(client as never);
 
   const { result } = renderHook(() => useChat());
@@ -80,7 +119,11 @@ test("send() begins the turn and streams a text message to the agent", async () 
 
   expect(useChatStore.getState().turns[0]).toMatchObject({ role: "user", text: "hello" });
   const [args] = client.sendMessageStream.mock.calls[0]!;
-  expect(args.message).toMatchObject({ role: "user", parts: [{ kind: "text", text: "hello" }], metadata: { model: "m1" } });
+  expect(args.message).toMatchObject({
+    role: Role.ROLE_USER,
+    parts: [textPart("hello")],
+    metadata: { model: "m1" },
+  });
   await waitFor(() => expect(useChatStore.getState().isStreaming).toBe(false));
   expect(useChatStore.getState().turns.at(-1)!.text).toBe("hi back");
 });
@@ -96,7 +139,9 @@ test("send() uploads attached files first and references them by url in the mess
 
   expect(uploadFile).toHaveBeenCalledWith(file);
   const [args] = client.sendMessageStream.mock.calls[0]!;
-  expect(args.message.parts).toEqual([{ kind: "file", file: { uri: "http://files/a.png", mimeType: "image/png", name: "a.png" } }]);
+  expect(args.message.parts).toEqual([
+    { content: { $case: "url", value: "http://files/a.png" }, metadata: undefined, filename: "a.png", mediaType: "image/png" },
+  ]);
   expect(useChatStore.getState().turns[0]!.attachments).toEqual([{ name: "a.png", url: "http://files/a.png", mimeType: "image/png", size: 1 }]);
 });
 
@@ -113,7 +158,7 @@ test("send() includes activeDocumentIds in metadata when documents are active", 
 });
 
 test("a task event records the active task/context ids", async () => {
-  const client = fakeClient([{ kind: "task", id: "t1", contextId: "c1" }]);
+  const client = fakeClient([taskEvent("t1", "c1")]);
   vi.mocked(getClient).mockResolvedValue(client as never);
   const { result } = renderHook(() => useChat());
 
@@ -125,13 +170,11 @@ test("a task event records the active task/context ids", async () => {
 
 test("a status-update applies envelope data parts and finishes on 'completed'", async () => {
   const client = fakeClient([
-    {
-      kind: "status-update",
-      status: {
-        state: "completed",
-        message: { parts: [{ kind: "data", data: { v: 1, type: "text", delta: "" } }, { kind: "text", text: "final" }] },
-      },
-    },
+    statusEvent({
+      state: TaskState.TASK_STATE_COMPLETED,
+      message: agentMessage([dataPart({ v: 1, type: "text", delta: "" }), textPart("final")]),
+      timestamp: "t",
+    }),
   ]);
   vi.mocked(getClient).mockResolvedValue(client as never);
   const { result } = renderHook(() => useChat());
@@ -144,7 +187,9 @@ test("a status-update applies envelope data parts and finishes on 'completed'", 
 });
 
 test("a status-update in 'input-required' pauses for approval", async () => {
-  const client = fakeClient([{ kind: "status-update", status: { state: "input-required", message: { parts: [] } } }]);
+  const client = fakeClient([
+    statusEvent({ state: TaskState.TASK_STATE_INPUT_REQUIRED, message: agentMessage([]), timestamp: "t" }),
+  ]);
   vi.mocked(getClient).mockResolvedValue(client as never);
   const { result } = renderHook(() => useChat());
 
@@ -156,7 +201,9 @@ test("a status-update in 'input-required' pauses for approval", async () => {
 });
 
 test("a status-update in 'failed' records the failure message", async () => {
-  const client = fakeClient([{ kind: "status-update", status: { state: "failed", message: { parts: [{ kind: "text", text: "went wrong" }] } } }]);
+  const client = fakeClient([
+    statusEvent({ state: TaskState.TASK_STATE_FAILED, message: agentMessage([textPart("went wrong")]), timestamp: "t" }),
+  ]);
   vi.mocked(getClient).mockResolvedValue(client as never);
   const { result } = renderHook(() => useChat());
 
@@ -166,7 +213,7 @@ test("a status-update in 'failed' records the failure message", async () => {
 });
 
 test("a bare 'message' event finishes the turn with its text", async () => {
-  const client = fakeClient([{ kind: "message", role: "agent", messageId: "a1", parts: [{ kind: "text", text: "done" }] }]);
+  const client = fakeClient([messageEvent([textPart("done")])]);
   vi.mocked(getClient).mockResolvedValue(client as never);
   const { result } = renderHook(() => useChat());
 
@@ -196,7 +243,7 @@ test("persists the conversation after a stream completes, and swallows a save er
   // (normally set by a 'task' event, omitted here since this test only cares about persistence).
   useChatStore.setState({ contextId: "c1" });
   vi.mocked(saveConversation).mockRejectedValue(new Error("save failed"));
-  const client = fakeClient([{ kind: "message", role: "agent", messageId: "a1", parts: [{ kind: "text", text: "ok" }] }]);
+  const client = fakeClient([messageEvent([textPart("ok")])]);
   vi.mocked(getClient).mockResolvedValue(client as never);
   const { result } = renderHook(() => useChat());
 
@@ -215,7 +262,7 @@ test("respond() resumes with the pending task id and streams a decision message"
   const [args] = client.sendMessageStream.mock.calls[0]!;
   expect(args.message).toMatchObject({
     taskId: "pending-1",
-    parts: [{ kind: "data", data: { type: "decision", decisions: [{ type: "approve" }] } }],
+    parts: [dataPart({ type: "decision", decisions: [{ type: "approve" }] })],
   });
 });
 
@@ -237,7 +284,7 @@ test("stop() cancels the active task", async () => {
 
   await act(async () => result.current.stop());
 
-  expect(client.cancelTask).toHaveBeenCalledWith({ id: "t1" });
+  expect(client.cancelTask).toHaveBeenCalledWith({ tenant: "", id: "t1", metadata: undefined });
 });
 
 test("stop() is a no-op without an active task, and swallows a cancel error otherwise", async () => {

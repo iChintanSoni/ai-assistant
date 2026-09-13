@@ -213,3 +213,47 @@ instead (`documentSummarize.ts`'s `summarizeBatchesSequentially`,
 `documentFigures.ts`, and the document-ingest pipeline's own background
 enrichment step all avoid concurrent Ollama call streams for this reason —
 see `documentIngest.ts`'s `runBackgroundEnrichment`).
+
+## `@a2a-js/sdk` v1's resume path silently violates a new event-ordering rule
+
+Migrating `@a2a-js/sdk` `^0.3` → `^1` is not a routine bump: v1's `Task`/
+`Message`/`Part` types moved from JSON-Schema shapes to protobuf-generated
+ones (`TaskState`/`Role` become numeric enums, not `"working"`/`"agent"`
+strings; `Part` becomes a `{ content: { $case, value } }` union instead of a
+`kind`-discriminated one), and `AgentExecutor.execute()` gained a
+server-enforced invariant: **every call must publish a `task` or `message`
+event as its first event, including a resume/follow-up call** — the request
+handler rejects a stream that opens with a `statusUpdate`.
+
+This repo's HITL resume path (`executor.ts`, the `isResume` branch) used to
+skip straight to streaming `status-update` envelopes with no task event
+first, since the task already existed. That type-checks fine under v1 (the
+invariant is documented, not enforced by the type system) and would have
+broken HITL resume at runtime post-migration, silently, with nothing to
+catch it short of driving an actual approval flow. Same issue existed on the
+*fresh*-turn failure paths: an ineligible-model/bad-upload rejection called
+`publisher.failed(...)` before `publisher.startTask(...)`, which is now also
+a first-event violation.
+
+**Fix**: `publisher.ts` gained a `resumeTask(task: Task)` method that
+republishes the existing `Task` (from `RequestContext.task`, which the SDK
+guarantees is populated on a follow-up) as the resume's first event;
+`executor.ts` calls it before anything else on the resume branch, and the
+fresh-turn branch now calls `publisher.startTask(userMessage)` unconditionally
+before running model/upload validation, instead of after. Covered by a
+regression test in `executor.test.ts` that asserts the resume path's first
+`bus.publish()` call is a `task` event.
+
+## `@a2a-js/sdk` v1's generated types require every field spelled out
+
+The protobuf-generated `Message`/`Task`/`Part`/`SendMessageRequest`/etc.
+interfaces declare fields as `foo: Bar | undefined` rather than `foo?: Bar`
+— so a plain object literal missing a key fails to type-check even when
+`undefined` is a legal value for it (TypeScript's excess/missing-property
+checks apply to required keys regardless of whether the value type includes
+`undefined`). There's no ergonomic `Message.create({...})`/`fromPartial`
+helper exported from the package's public `.d.ts` either — the exported
+`MessageFns<T>` only has `fromJSON`/`toJSON`. **Fix**: small local builder
+functions per file (e.g. `textPart`/`dataPart` in `publisher.ts`,
+`parts.ts`, `a2aPeers.ts`, and `useChat.ts`) that spell out every field
+once, rather than repeating full literals at every call site.

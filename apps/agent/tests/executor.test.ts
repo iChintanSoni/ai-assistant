@@ -6,7 +6,7 @@ vi.mock("../src/server/streaming.js", () => ({ runAgentToEvents: vi.fn() }));
 vi.mock("../src/agent/documentStore.js", () => ({ getDocumentsByIds: vi.fn(() => []) }));
 
 import type { ExecutionEventBus, RequestContext } from "@a2a-js/sdk/server";
-import type { Message } from "@a2a-js/sdk";
+import { Role, TaskState, type Message, type Part, type Task } from "@a2a-js/sdk";
 import { Command } from "@langchain/langgraph";
 import { buildAgent } from "../src/agent/deepAgent.js";
 import { describeModel } from "../src/agent/models.js";
@@ -15,16 +15,41 @@ import { getDocumentsByIds } from "../src/agent/documentStore.js";
 import { A2APublisher } from "../src/server/publisher.js";
 import { DeepAgentExecutor } from "../src/server/executor.js";
 
-function fakeBus(): ExecutionEventBus {
+function fakeBus(): ExecutionEventBus & { publish: ReturnType<typeof vi.fn>; finished: ReturnType<typeof vi.fn> } {
   return { publish: vi.fn(), finished: vi.fn() } as never;
 }
 
-function textMessage(text: string, overrides: Partial<Message> = {}): Message {
-  return { kind: "message", role: "user", messageId: "m1", parts: [{ kind: "text", text }], ...overrides };
+function textPart(text: string): Part {
+  return { content: { $case: "text", value: text }, metadata: undefined, filename: "", mediaType: "text/plain" };
 }
 
-function ctx(userMessage: Message, taskId = "task-1", contextId = "ctx-1"): RequestContext {
-  return { userMessage, taskId, contextId } as never;
+function textMessage(text: string, overrides: Partial<Message> = {}): Message {
+  return {
+    messageId: "m1",
+    contextId: "",
+    taskId: "",
+    role: Role.ROLE_USER,
+    parts: [textPart(text)],
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
+    ...overrides,
+  };
+}
+
+function fakeTask(taskId: string, contextId: string): Task {
+  return {
+    id: taskId,
+    contextId,
+    status: { state: TaskState.TASK_STATE_INPUT_REQUIRED, message: undefined, timestamp: "t" },
+    artifacts: [],
+    history: [],
+    metadata: undefined,
+  };
+}
+
+function ctx(userMessage: Message, taskId = "task-1", contextId = "ctx-1", task?: Task): RequestContext {
+  return { userMessage, taskId, contextId, task } as never;
 }
 
 function eligibleModel(modalities: string[] = ["text"]) {
@@ -32,6 +57,7 @@ function eligibleModel(modalities: string[] = ["text"]) {
 }
 
 let startTaskSpy: ReturnType<typeof vi.spyOn>;
+let resumeTaskSpy: ReturnType<typeof vi.spyOn>;
 let completeSpy: ReturnType<typeof vi.spyOn>;
 let failedSpy: ReturnType<typeof vi.spyOn>;
 let inputRequiredSpy: ReturnType<typeof vi.spyOn>;
@@ -45,6 +71,7 @@ beforeEach(() => {
   vi.mocked(getDocumentsByIds).mockReset().mockReturnValue([]);
 
   startTaskSpy = vi.spyOn(A2APublisher.prototype, "startTask");
+  resumeTaskSpy = vi.spyOn(A2APublisher.prototype, "resumeTask");
   completeSpy = vi.spyOn(A2APublisher.prototype, "complete");
   failedSpy = vi.spyOn(A2APublisher.prototype, "failed");
   inputRequiredSpy = vi.spyOn(A2APublisher.prototype, "inputRequired");
@@ -62,6 +89,7 @@ test("fails without building an agent when the selected model isn't tool-eligibl
 
   await executor.execute(ctx(textMessage("hi")), fakeBus());
 
+  expect(startTaskSpy).toHaveBeenCalled();
   expect(failedSpy).toHaveBeenCalledWith(expect.stringMatching(/can't orchestrate/));
   expect(buildAgent).not.toHaveBeenCalled();
   expect(runAgentToEvents).not.toHaveBeenCalled();
@@ -71,7 +99,7 @@ test("fails when an uploaded part isn't supported by the selected model's modali
   vi.mocked(describeModel).mockResolvedValue(eligibleModel(["text"])); // no "image"
   const executor = new DeepAgentExecutor();
   const message = textMessage("", {
-    parts: [{ kind: "file", file: { mimeType: "image/png", bytes: "abc" } }],
+    parts: [{ content: { $case: "raw", value: Buffer.from("abc") }, metadata: undefined, filename: "", mediaType: "image/png" }],
   });
 
   await executor.execute(ctx(message), fakeBus());
@@ -102,10 +130,14 @@ test("a vision model receives an image-only turn without requiring a text part",
   });
   const executor = new DeepAgentExecutor();
   const message: Message = {
-    kind: "message",
-    role: "user",
     messageId: "image-only",
-    parts: [{ kind: "file", file: { mimeType: "image/png", bytes: "QUJD" } }],
+    contextId: "",
+    taskId: "",
+    role: Role.ROLE_USER,
+    parts: [{ content: { $case: "raw", value: Buffer.from("QUJD", "base64") }, metadata: undefined, filename: "", mediaType: "image/png" }],
+    metadata: undefined,
+    extensions: [],
+    referenceTaskIds: [],
   };
 
   await executor.execute(ctx(message), fakeBus());
@@ -191,21 +223,56 @@ test("defaults an interrupt's allowedDecisions to approve/reject when no reviewC
   });
 });
 
-test("a resume turn (decision message) skips model/part validation and passes a Command to runAgentToEvents", async () => {
+test("a resume turn (decision message) skips model/part validation, republishes the task, and passes a Command to runAgentToEvents", async () => {
   vi.mocked(runAgentToEvents).mockResolvedValue({ finalText: "resumed answer", interrupt: null, usage: null, compaction: null });
   const executor = new DeepAgentExecutor();
   const resumeMessage = textMessage("", {
-    parts: [{ kind: "data", data: { type: "decision", decisions: [{ type: "approve" }] } }],
+    parts: [{ content: { $case: "data", value: { type: "decision", decisions: [{ type: "approve" }] } }, metadata: undefined, filename: "", mediaType: "application/json" }],
   });
+  const task = fakeTask("task-1", "ctx-1");
 
-  await executor.execute(ctx(resumeMessage), fakeBus());
+  await executor.execute(ctx(resumeMessage, "task-1", "ctx-1", task), fakeBus());
 
   expect(describeModel).not.toHaveBeenCalled();
   expect(startTaskSpy).not.toHaveBeenCalled();
+  expect(resumeTaskSpy).toHaveBeenCalledWith(task);
   const [runArgs] = vi.mocked(runAgentToEvents).mock.calls[0]!;
   expect((runArgs as { input: unknown }).input).toBeInstanceOf(Command);
   expect(((runArgs as { input: Command }).input).resume).toEqual({ decisions: [{ type: "approve" }] });
   expect(completeSpy).toHaveBeenCalledWith("resumed answer");
+});
+
+test("a resume without a matching stored task fails instead of silently proceeding", async () => {
+  const executor = new DeepAgentExecutor();
+  const resumeMessage = textMessage("", {
+    parts: [{ content: { $case: "data", value: { type: "decision", decisions: [{ type: "approve" }] } }, metadata: undefined, filename: "", mediaType: "application/json" }],
+  });
+
+  await executor.execute(ctx(resumeMessage, "task-1", "ctx-1", undefined), fakeBus());
+
+  expect(resumeTaskSpy).not.toHaveBeenCalled();
+  expect(failedSpy).toHaveBeenCalledWith(expect.stringMatching(/no task found/i));
+  expect(runAgentToEvents).not.toHaveBeenCalled();
+});
+
+test("a resume's first published event is the republished task, before any streamed envelope (server-enforced ordering)", async () => {
+  vi.mocked(runAgentToEvents).mockImplementation(async ({ publisher }: { publisher: A2APublisher }) => {
+    publisher.emit({ v: 1, type: "text", delta: "..." });
+    return { finalText: "resumed answer", interrupt: null, usage: null, compaction: null };
+  });
+  const executor = new DeepAgentExecutor();
+  const resumeMessage = textMessage("", {
+    parts: [{ content: { $case: "data", value: { type: "decision", decisions: [{ type: "approve" }] } }, metadata: undefined, filename: "", mediaType: "application/json" }],
+  });
+  const task = fakeTask("task-1", "ctx-1");
+  const bus = fakeBus();
+
+  await executor.execute(ctx(resumeMessage, "task-1", "ctx-1", task), bus);
+
+  expect(bus.publish.mock.calls.length).toBeGreaterThanOrEqual(2);
+  const [first, second] = bus.publish.mock.calls.map((call) => call[0] as { kind: string });
+  expect(first!.kind).toBe("task");
+  expect(second!.kind).toBe("statusUpdate");
 });
 
 test("prepends an active-documents note to the turn content when documentIds are present in metadata", async () => {
