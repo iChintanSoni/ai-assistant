@@ -177,9 +177,11 @@ PUBLIC_URL=http://my-macbook.local:4000
 BASE_URL=http://my-macbook.local:6060
 ```
 
-`hostname` prints yours. The dev server only accepts `*.local` names and IPs — it
-rejects any other `Host` header — so if you use a different name, add it to
-`server.allowedHosts` in `apps/frontend/vite.config.ts`.
+`hostname` prints yours. Vite normally rejects a `Host` header that isn't
+localhost or an IP; `apps/frontend/vite.config.ts` sets `allowedHosts: true` so
+any name — `.local`, a router-assigned hostname, Tailscale MagicDNS, ngrok —
+works without a source edit. That's fine here specifically because this is a
+single-user tool with no authentication regardless (see Security below).
 
 An IP works too, but file URLs are stored in saved
 transcripts — so a conversation recorded against `192.168.1.5` renders broken once
