@@ -29,12 +29,17 @@ vi.mock("./lib/modelManagement", () => ({
 vi.mock("./hooks/useChat", () => ({
   useChat: vi.fn(() => ({ send: vi.fn(), respond: vi.fn(), stop: vi.fn() })),
 }));
+vi.mock("./lib/upload", () => ({ uploadFile: vi.fn() }));
+vi.mock("./lib/pendingShareStore", () => ({ takePendingShare: vi.fn() }));
 
 import { createMemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { getConversation } from "./lib/history";
 import { fetchModels } from "./lib/models";
 import type { ModelInfo } from "./lib/models";
+import { registerDocument, type DocumentSummary } from "./lib/documents";
+import { takePendingShare } from "./lib/pendingShareStore";
+import { uploadFile } from "./lib/upload";
 import { routes } from "./routes";
 import { useChatStore } from "./store/chat";
 
@@ -44,6 +49,24 @@ function model(): ModelInfo {
 
 function detail(id = "c1") {
   return { id, model: "m1", turns: [], title: "A chat", createdAt: 0, updatedAt: 0 };
+}
+
+function documentSummary(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
+  return {
+    id: "doc-1",
+    originalName: "shared.pdf",
+    mimeType: "application/pdf",
+    size: 1,
+    pageCount: 0,
+    sizeClass: "small",
+    summary: null,
+    summaryStatus: "pending",
+    status: "pending",
+    error: null,
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides,
+  };
 }
 
 /** Mounts the real route table in a fresh memory router — one per test, so no history leaks between them. */
@@ -58,6 +81,9 @@ function renderAt(entries: string[], initialIndex?: number) {
 beforeEach(() => {
   vi.mocked(fetchModels).mockReset().mockResolvedValue({ models: [model()], defaultModel: "m1" });
   vi.mocked(getConversation).mockReset();
+  vi.mocked(takePendingShare).mockReset().mockResolvedValue([]);
+  vi.mocked(uploadFile).mockReset();
+  vi.mocked(registerDocument).mockReset();
   useChatStore.setState({
     turns: [],
     selectedModel: null,
@@ -258,4 +284,38 @@ test("landing on the hub with nothing open doesn't clobber a pre-seeded transcri
   });
   renderAt(["/"]);
   expect(screen.queryByText(/let's get started/)).not.toBeInTheDocument();
+});
+
+test("/share-target with a pending shared file ingests it via the same pipeline as the paperclip, then returns to the hub", async () => {
+  const file = new File(["x"], "shared.pdf", { type: "application/pdf" });
+  vi.mocked(takePendingShare).mockResolvedValue([file]);
+  vi.mocked(uploadFile).mockResolvedValue({ url: "http://files/shared.pdf", filename: "shared.pdf", size: 1, mimetype: "application/pdf" });
+  vi.mocked(registerDocument).mockResolvedValue(documentSummary());
+
+  const { router } = renderAt(["/share-target"]);
+
+  await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  expect(uploadFile).toHaveBeenCalledWith(file);
+  expect(registerDocument).toHaveBeenCalledWith(expect.objectContaining({ filename: "shared.pdf" }));
+  await waitFor(() => expect(useChatStore.getState().activeDocumentIds).toContain("doc-1"));
+});
+
+test("/share-target with nothing pending shows an honest empty state instead of hanging", async () => {
+  vi.mocked(takePendingShare).mockResolvedValue([]);
+
+  renderAt(["/share-target"]);
+
+  expect(await screen.findByText(/nothing to add/i)).toBeInTheDocument();
+  expect(uploadFile).not.toHaveBeenCalled();
+});
+
+test("/share-target recovers with an honest error state instead of hanging forever when takePendingShare rejects", async () => {
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.mocked(takePendingShare).mockRejectedValue(new Error("IndexedDB is disabled"));
+
+  renderAt(["/share-target"]);
+
+  expect(await screen.findByText(/couldn't add the shared file/i)).toBeInTheDocument();
+  expect(uploadFile).not.toHaveBeenCalled();
+  expect(logged).toHaveBeenCalled();
 });

@@ -182,24 +182,55 @@ an offline-capable app shell (decision 9 in `PLAN.md`).
   inline script (first paint, a hardcoded literal since it runs before any
   module graph exists — keep it in sync by hand) and `theme.ts`'s
   `applyThemeClass` (every later change, importing `THEME_COLOR`).
-- **Service worker**: `registerType: 'autoUpdate'`, `generateSW` mode, no
-  `runtimeCaching` rules — the default precache-only strategy covers the
-  app shell + static build assets (plus `includeAssets` for `favicon.svg`/
-  `apple-touch-icon.png`, which aren't otherwise swept in) and nothing else.
-  **Never add a `runtimeCaching` rule for the agent or file-storage
-  origins** — a stale model list, document status, or transcript is worse
-  than a loading state. `devOptions` is deliberately omitted (defaults to
-  disabled): a service worker serving a stale shell mid-development is a
-  confusing failure mode, so `npm run dev` never registers one — only a
-  production build (`npm run build && npm run preview`) does.
+- **Service worker**: hand-written (`src/sw.ts`), built via
+  `vite-plugin-pwa`'s `injectManifest` strategy (`strategies:
+  'injectManifest'`, `srcDir`/`filename` in `vite.config.ts`) rather than
+  the fully auto-generated `generateSW` — switched specifically so the
+  share-target route below has a `fetch` listener to hook into; a fully
+  generated SW has no such hook. `sw.ts` calls `precacheAndRoute` +
+  registers the SPA navigation fallback itself (what `generateSW` used to
+  do automatically), and calls `self.skipWaiting()`/`clientsClaim()`
+  directly (no plugin-config equivalent under `injectManifest`). Its own
+  project (`tsconfig.worker.json`, `lib: ["WebWorker"]`) is excluded from
+  `tsconfig.app.json` — a service worker isn't a DOM context, and
+  `ServiceWorkerGlobalScope` isn't declared under the `DOM` lib. Still no
+  routes for the agent/file-storage origins at all — **never add one**; a
+  stale model list, document status, or transcript is worse than a loading
+  state. `devOptions` stays omitted (defaults to disabled) so `npm run dev`
+  never registers one — only a production build
+  (`npm run build && npm run preview`) does.
   `injectRegister: false` — the plugin's own auto-injected registration
   calls `window.location.reload()` unprompted the instant a new SW version
   activates (including mid-session), which would silently discard whatever
   the user was typing in the composer. `main.tsx` registers it manually via
   `virtual:pwa-register` with a no-op `onNeedReload`: `skipWaiting`/
-  `clientsClaim` (baked into the generated SW for `autoUpdate`) still let a
-  new version take over in the background; the no-op just means it's served
-  starting next natural navigation instead of forced.
+  `clientsClaim` still let a new version take over in the background; the
+  no-op just means it's served starting next natural navigation instead of
+  forced.
+- **Share target**: the manifest's `share_target` (`action: '/share-target'`,
+  same accept list as the paperclip — `lib/documentAccept.ts`'s
+  `DOCUMENT_ACCEPT`, imported by both `vite.config.ts` and
+  `lib/documents.ts`) registers the installed app as an OS "Share"/"Open
+  with" destination. The OS triggers a real POST navigation to that URL;
+  `sw.ts`'s `registerRoute` (matched on `method === 'POST'` — registered
+  *before* the SPA navigation route, since workbox treats a POST
+  navigation as `mode: 'navigate'` too, and the first matching registered
+  route wins) reads the file(s) out of the `multipart/form-data` body,
+  stores them via `lib/pendingShareStore.ts` (a small hand-rolled
+  IndexedDB store — File objects are directly structured-cloneable, no
+  serialization needed), and responds with a 303 redirect back to
+  `/share-target`. The browser's GET follow-up to that redirect *does* fall
+  through to the SPA navigation route, landing on `routes/ShareTargetRoute.tsx`,
+  which recovers the file(s) (`takePendingShare()`, consume-once) and hands
+  them straight to `useAttachments.ts`'s `addFiles` — the exact same
+  classification/upload/`POST /documents`/`addActiveDocument` pipeline the
+  paperclip and drag-and-drop already use, so nothing about ingest itself
+  is reimplemented. Then navigates to `/`, landing in a fresh chat with the
+  shared file already active. Verified live via a real `<form
+  method="post" enctype="multipart/form-data">` + `DataTransfer`-attached
+  file submitted in the browser — a genuine POST navigation, the same
+  shape an OS share triggers — since no browser-automation tool can invoke
+  a real OS share sheet.
 - **Offline state**: `hooks/useOnlineStatus.ts` wraps `navigator.onLine` +
   the `online`/`offline` window events; `components/OfflineBanner.tsx`
   renders a fixed top banner off it, wired into `RootLayout.tsx` so it's

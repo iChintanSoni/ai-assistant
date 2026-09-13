@@ -1,10 +1,11 @@
 /**
  * The route table.
  *
- *   /           the chat hub
- *   /c/:id      one conversation — deep-linkable, refresh-safe, back/forward-safe
- *   /files      the Files gallery
- *   /settings   settings
+ *   /               the chat hub
+ *   /c/:id          one conversation — deep-linkable, refresh-safe, back/forward-safe
+ *   /files          the Files gallery
+ *   /settings       settings
+ *   /share-target   landing page for a file shared in from another app (sw.ts)
  *
  * Exported as a plain array rather than a built router so tests can mount it in a
  * fresh memory router per test; a module-scope browser router would be shared (and
@@ -16,6 +17,7 @@ import { ChatRoute } from "./routes/ChatRoute";
 import { FilesRoute } from "./routes/FilesRoute";
 import { RootFallback, RootLayout } from "./routes/RootLayout";
 import { SettingsRoute } from "./routes/SettingsRoute";
+import { ShareTargetRoute } from "./routes/ShareTargetRoute";
 import { useChatStore } from "./store/chat";
 
 /**
@@ -58,6 +60,7 @@ export const routes: RouteObject[] = [
       { path: "c/:id", element: <ChatRoute />, loader: conversationLoader },
       { path: "files", element: <FilesRoute /> },
       { path: "settings", element: <SettingsRoute /> },
+      { path: "share-target", element: <ShareTargetRoute /> },
       // An unknown path used to fall through to the chat view; keep that rather than
       // dead-ending on the router's unstyled default error page.
       { path: "*", element: <Navigate to="/" replace /> },

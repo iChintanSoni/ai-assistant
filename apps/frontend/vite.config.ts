@@ -4,6 +4,7 @@ import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { THEME_COLOR } from './src/lib/themeColors.js'
+import { DOCUMENT_ACCEPT } from './src/lib/documentAccept.js'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -23,21 +24,23 @@ export default defineConfig({
     tailwindcss(),
     babel({ presets: [reactCompilerPreset()] }),
     VitePWA({
+      // injectManifest, not the default generateSW: the share-target route
+      // below needs a hand-written fetch listener (src/sw.ts) to intercept
+      // the manifest's share_target POST, which a fully auto-generated
+      // service worker has no hook for.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       // We register the SW ourselves (src/main.tsx) with a no-op onNeedReload
       // instead of the plugin's auto-injected script: with registerType
       // 'autoUpdate' and no onNeedReload, vite-plugin-pwa's default register
       // logic calls `window.location.reload()` the instant a new SW version
       // activates — including mid-session, silently discarding whatever the
-      // user was typing in the composer.
-      //
-      // injectRegister: false also turns off the plugin's own auto-set of
-      // workbox.skipWaiting/clientsClaim (it only sets those when
-      // injectRegister is 'auto'/unset — see its source), so they're set
-      // explicitly below instead: without them the new SW would sit in
-      // 'waiting' forever, since nothing else ever tells it to activate.
-      // skipWaiting/clientsClaim still let it take over network requests in
-      // the background as soon as it installs; the no-op onNeedReload only
+      // user was typing in the composer. sw.ts calls skipWaiting/clientsClaim
+      // directly (no plugin-config equivalent under injectManifest — that's
+      // a generateSW-only option) so the new version still takes over
+      // network requests in the background; the no-op onNeedReload only
       // stops that from forcing a page reload.
       injectRegister: false,
       // Deliberately omitted (defaults to disabled): a service worker
@@ -67,17 +70,16 @@ export default defineConfig({
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
-      },
-      workbox: {
-        // See the injectRegister comment above: explicit because
-        // injectRegister: false skips the plugin's own auto-set of these.
-        skipWaiting: true,
-        clientsClaim: true,
-        // No runtimeCaching entries: the default precache-only strategy
-        // covers the app shell + static build assets. Never add a rule that
-        // could cache the agent/file-storage API responses (PLAN.md F3) —
-        // a stale model list, document status, or transcript is worse than
-        // a loading state.
+        // Same accept list the paperclip already advertises (lib/documents.ts's
+        // DOCUMENT_ACCEPT) — the OS share sheet should only offer this app for
+        // files it can already handle, nothing new to validate. sw.ts
+        // intercepts the resulting POST; ShareTargetRoute.tsx renders it.
+        share_target: {
+          action: '/share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: { files: [{ name: 'file', accept: DOCUMENT_ACCEPT.split(',') }] },
+        },
       },
     }),
   ],
