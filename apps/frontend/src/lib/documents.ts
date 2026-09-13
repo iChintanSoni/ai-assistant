@@ -2,6 +2,8 @@
 import { AGENT_URL } from "./config";
 import type { ModelInfo } from "./models";
 
+export { DOCUMENT_ACCEPT } from "./documentAccept";
+
 export type DocumentStatus = "pending" | "ready" | "failed";
 export type SizeClass = "pending" | "small" | "large";
 
@@ -54,20 +56,6 @@ export async function deleteDocument(id: string): Promise<void> {
   const res = await fetch(`${AGENT_URL}/documents/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Could not delete document (HTTP ${res.status})`);
 }
-
-/**
- * The document mimetypes/extensions the paperclip accepts, independent of
- * the selected model's modalities. Includes image/* unconditionally — a
- * dropped image is always acceptable one way or another (see
- * isDocumentFile's model-aware OCR fallback), so the picker shouldn't hide
- * images just because the current model can't see them directly.
- */
-export const DOCUMENT_ACCEPT =
-  ".pdf,.docx,.pptx,.txt,.md,.csv,.xlsx,.html,.htm,application/pdf," +
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document," +
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation," +
-  "text/plain,text/markdown,text/csv,text/html," +
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/*";
 
 const DOCUMENT_EXTENSIONS = [".pdf", ".docx", ".pptx", ".txt", ".md", ".csv", ".xlsx", ".html", ".htm"];
 

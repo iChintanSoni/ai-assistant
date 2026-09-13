@@ -641,10 +641,18 @@ load-bearing.
 
 **OS integration** *(most need F3)*
 - Web Share API — share a generated document/diagram/image out to another app.
-- **Share target + file handlers** in the manifest — receive a PDF from the OS
-  share sheet or "Open with" and drop it straight into document ingest. The
-  single highest-value one on this list: it makes the assistant a first-class
-  destination for files.
+- **Share target + file handlers** in the manifest ✅ *done* — receive a PDF
+  from the OS share sheet or "Open with" and drop it straight into document
+  ingest. The single highest-value one on this list: it makes the assistant
+  a first-class destination for files. Landed on
+  `feat/pwa-share-target`: `manifest.share_target` + a hand-written
+  `src/sw.ts` (switched `vite-plugin-pwa` to `injectManifest` for this —
+  `generateSW` has no hook for a custom `fetch` listener), a small
+  `lib/pendingShareStore.ts` IndexedDB handoff, and `routes/ShareTargetRoute.tsx`
+  reusing `useAttachments.ts`'s existing upload/ingest pipeline verbatim —
+  no ingest logic duplicated. See `docs/frontend.md`'s PWA section and
+  `docs/gotchas.md` for the TS-project-split, cross-config-import, and
+  workbox-routing-precedence gotchas hit along the way.
 - Notification API — tell the user a long job finished (ingest, image
   generation, summarization) while the tab is backgrounded.
 - Badging API — a count of finished-but-unseen jobs on the installed icon.

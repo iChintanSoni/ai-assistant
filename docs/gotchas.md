@@ -257,3 +257,75 @@ helper exported from the package's public `.d.ts` either — the exported
 functions per file (e.g. `textPart`/`dataPart` in `publisher.ts`,
 `parts.ts`, `a2aPeers.ts`, and `useChat.ts`) that spell out every field
 once, rather than repeating full literals at every call site.
+
+## A hand-written service worker needs its own TS project, not `tsconfig.app.json`
+
+Switching `vite-plugin-pwa` to `injectManifest` (needed for the share-target
+route's custom `fetch` listener — `generateSW` has no hook for that) means
+`src/sw.ts` is real application source under `src/`, which
+`tsconfig.app.json`'s blanket `"include": ["src"]` would otherwise pull in.
+That fails: `ServiceWorkerGlobalScope` (and `self.skipWaiting()`,
+`clients`, etc.) isn't declared under the `DOM` lib `tsconfig.app.json`
+uses — a service worker isn't a DOM context. **Fix**: a new
+`tsconfig.worker.json` (`lib: ["ES2023", "WebWorker"]`, `include:
+["src/sw.ts", ...]`), referenced from the root `tsconfig.json`, with
+`tsconfig.app.json` gaining `"exclude": ["src/sw.ts"]` so the same file
+isn't compiled under both DOM and WebWorker lib sets (which conflict).
+
+## Importing an app module from `vite.config.ts` only works if it's a leaf
+
+`vite.config.ts` runs under `tsconfig.node.json`'s `moduleResolution:
+nodenext`, which requires explicit `.js` extensions on every relative
+import — but files under `src/` are written for `tsconfig.app.json`'s
+`moduleResolution: bundler`, where extensions are optional and usually
+omitted. Importing a leaf module with no imports of its own (e.g.
+`lib/themeColors.ts`, for the PWA manifest's `theme_color`) works fine.
+Importing a *non*-leaf module (`lib/documents.ts`, for its `DOCUMENT_ACCEPT`
+list — it also imports `./config` and `./models`) breaks: `tsc -b` pulls
+those transitive imports into the `node` project too and applies its
+stricter extension rule to them, and they don't have `.js` extensions.
+**Fix**: extracted `DOCUMENT_ACCEPT` into its own leaf module
+(`lib/documentAccept.ts`, re-exported from `lib/documents.ts` so existing
+importers don't change) — the general rule: anything `vite.config.ts`
+needs to import from `src/` must have zero relative imports of its own.
+
+## jsdom's `File`/`Blob` aren't recognized by structured-clone (breaks `fake-indexeddb` tests)
+
+`fake-indexeddb` (added as a devDependency to unit-test
+`lib/pendingShareStore.ts`, since jsdom has no native IndexedDB) uses the
+structured-clone algorithm internally, same as real IndexedDB. Under
+vitest's jsdom environment, storing a `File`/`Blob` and reading it back
+silently returns `{}` — none of `.name`/`.type`/`.size` survive — even
+though `f instanceof Blob` is `true` right before the write. Root cause,
+confirmed by running the exact same store code directly under plain
+Node.js (where it round-trips `File.name`/`.type` correctly): jsdom
+provides its own pure-JS `File`/`Blob` classes, and structured-clone
+implementations (real IndexedDB, `fake-indexeddb`, Node's own
+`structuredClone`) specifically recognize *native*, engine-backed Blobs —
+not a userland polyfill class, even one that duck-types correctly and
+passes `instanceof` checks. This is a known, tracked jsdom limitation
+(https://github.com/dumbmatter/fakeIndexedDB/issues/88), not something
+fixable from application code. **Fix**: the unit tests for this store
+assert on file *count* through put/take/replace/clear (the control flow
+that could actually have a bug), not on file content surviving the
+round-trip (a guarantee of real browser IndexedDB, not of this code) —
+content fidelity was instead verified live, in a real browser, per
+docs/frontend.md's share-target section.
+
+## Workbox route precedence for a POST-method "navigation"
+
+A form POST to a URL — exactly what an OS share sheet, or any
+`<form method="post">`, produces — is *still* `request.mode === 'navigate'`
+to a service worker's `fetch` listener, same as an ordinary link click.
+Workbox's `NavigationRoute` (used for the SPA-shell fallback) matches on
+that `mode`, not on HTTP method, so a POST navigation would fall into it
+too unless something takes precedence first. **Fix**: the share-target
+`registerRoute` (matched on `method === 'POST'` explicitly) is registered
+*before* the `NavigationRoute` in `sw.ts` — workbox dispatches to the
+first registered route whose match succeeds, so order here is load-bearing,
+not stylistic. Verified live (not just reasoned about) by submitting a
+real multipart POST via a `<form>` + `DataTransfer`-attached `File` in the
+browser, since this exact ordering assumption is the kind of thing best
+confirmed empirically — see the `@a2a-js/sdk` v1 entries above for a
+matching case where a similar library-internals assumption turned out
+wrong on first read.

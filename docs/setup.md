@@ -175,6 +175,14 @@ app seems to be serving old code: DevTools → Application → Service Workers �
 should never be needed for `npm run dev` itself, since dev intentionally
 never registers one.
 
+**Sharing a file to the installed app.** Once installed, the app appears
+as a target in your OS's "Share"/"Open with" sheet for the same file
+types the paperclip accepts (PDF/DOCX/PPTX/TXT/MD/CSV/XLSX/HTML, images).
+Sharing a file opens the app straight into a fresh chat with that file
+already ingested and active — no manual upload step. See
+[docs/frontend.md](frontend.md#pwa--installable-offline-shell) for how
+that's implemented (`sw.ts`'s share-target route).
+
 ## Using it from your phone
 
 The UI is mobile-first, but `npm run dev` binds the frontend to localhost only, so
