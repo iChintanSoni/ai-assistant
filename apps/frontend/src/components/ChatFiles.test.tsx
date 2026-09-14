@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
@@ -6,10 +6,17 @@ vi.mock("../lib/documents", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/documents")>();
   return { ...actual, getDocument: vi.fn() };
 });
+vi.mock("../lib/notify", () => ({
+  notifyIfHidden: vi.fn(),
+  getNotificationPermission: vi.fn(() => "granted"),
+  requestNotificationPermission: vi.fn(async () => "granted"),
+}));
 
 import { getDocument } from "../lib/documents";
 import type { DocumentSummary } from "../lib/documents";
+import { notifyIfHidden } from "../lib/notify";
 import { useChatStore } from "../store/chat";
+import { useNotificationsStore } from "../store/notifications";
 import { ChatFiles } from "./ChatFiles";
 import type { PendingAttachment } from "../hooks/useAttachments";
 
@@ -39,7 +46,9 @@ function setup(attachments: PendingAttachment[] = []) {
 
 beforeEach(() => {
   vi.mocked(getDocument).mockReset();
+  vi.mocked(notifyIfHidden).mockReset();
   useChatStore.setState({ activeDocumentIds: [] });
+  useNotificationsStore.setState({ enabled: false, permission: "granted" });
 });
 
 afterEach(() => {
@@ -144,4 +153,82 @@ test("shows both active documents and pending attachments together", async () =>
 
   await waitFor(() => expect(screen.getByText("report.pdf")).toBeInTheDocument());
   expect(screen.getByText("photo.png")).toBeInTheDocument();
+});
+
+// A plain microtask flush (timer-independent, unlike setTimeout) so a
+// resolved getDocument() promise chain — and the React state update / docsRef
+// sync effect it triggers — settles before the interval is advanced.
+async function flushMicrotasks() {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
+test("notifies once a pending document resolves to ready, but not on the initial load of an already-ready one", async () => {
+  useNotificationsStore.setState({ enabled: true, permission: "granted" });
+  useChatStore.setState({ activeDocumentIds: ["doc-1", "doc-5"] });
+  vi.mocked(getDocument).mockImplementation(async (id: string) =>
+    id === "doc-1" ? doc({ id: "doc-1", status: "pending" }) : doc({ id: "doc-5", originalName: "already.pdf", status: "ready" }),
+  );
+
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    setup();
+    await act(flushMicrotasks);
+    expect(notifyIfHidden).not.toHaveBeenCalled(); // already.pdf was ready on first load — not a transition
+
+    vi.mocked(getDocument).mockImplementation(async (id: string) =>
+      id === "doc-1" ? doc({ id: "doc-1", status: "ready" }) : doc({ id: "doc-5", originalName: "already.pdf", status: "ready" }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+      await flushMicrotasks();
+    });
+
+    expect(notifyIfHidden).toHaveBeenCalledWith("Document ready", "report.pdf");
+    expect(notifyIfHidden).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("notifies when a document transitions to failed", async () => {
+  useNotificationsStore.setState({ enabled: true, permission: "granted" });
+  useChatStore.setState({ activeDocumentIds: ["doc-2"] });
+  vi.mocked(getDocument).mockResolvedValue(doc({ id: "doc-2", originalName: "bad.pdf", status: "pending" }));
+
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    setup();
+    await act(flushMicrotasks);
+
+    vi.mocked(getDocument).mockResolvedValue(doc({ id: "doc-2", originalName: "bad.pdf", status: "failed", error: "Docling crashed" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+      await flushMicrotasks();
+    });
+
+    expect(notifyIfHidden).toHaveBeenCalledWith("Document failed to process", "bad.pdf");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("does not notify on an ingest transition when notifications are disabled", async () => {
+  useChatStore.setState({ activeDocumentIds: ["doc-1"] });
+  vi.mocked(getDocument).mockResolvedValue(doc({ id: "doc-1", status: "pending" }));
+
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    setup();
+    await act(flushMicrotasks);
+
+    vi.mocked(getDocument).mockResolvedValue(doc({ id: "doc-1", status: "ready" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+      await flushMicrotasks();
+    });
+
+    expect(notifyIfHidden).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 });

@@ -4,9 +4,15 @@ import { Role, TaskState, type Message, type Part, type StreamResponse } from "@
 import { getClient } from "../lib/a2a";
 import { isEnvelope, type Decision } from "../lib/envelope";
 import { saveConversation } from "../lib/history";
+import { notifyIfHidden } from "../lib/notify";
 import { uploadFile } from "../lib/upload";
 import { useChatStore, type UIAttachment } from "../store/chat";
+import { useNotificationsStore } from "../store/notifications";
 import { randomUUID } from "../lib/uuid";
+
+function notifyTurn(title: string, body?: string): void {
+  if (useNotificationsStore.getState().enabled) notifyIfHidden(title, body);
+}
 
 function textPart(text: string): Part {
   return { content: { $case: "text", value: text }, metadata: undefined, filename: "", mediaType: "text/plain" };
@@ -45,22 +51,27 @@ function handleEvent(event: StreamResponse): void {
     switch (status?.state) {
       case TaskState.TASK_STATE_COMPLETED:
         store.finishTurn("complete", finalText || undefined);
+        notifyTurn("Response ready", finalText || undefined);
         break;
       case TaskState.TASK_STATE_CANCELED:
         store.finishTurn("canceled");
         break;
       case TaskState.TASK_STATE_FAILED:
         store.finishTurn("failed", undefined, finalText || "The agent failed.");
+        notifyTurn("Something went wrong", finalText || "The agent failed.");
         break;
       case TaskState.TASK_STATE_INPUT_REQUIRED:
         store.pauseForApproval();
+        notifyTurn("Needs your approval", "The agent is waiting for you to approve or reject a tool call.");
         break;
     }
     return;
   }
 
   if (payload.$case === "message") {
-    store.finishTurn("complete", textFromParts(payload.value.parts) || undefined);
+    const finalText = textFromParts(payload.value.parts);
+    store.finishTurn("complete", finalText || undefined);
+    notifyTurn("Response ready", finalText || undefined);
   }
 }
 

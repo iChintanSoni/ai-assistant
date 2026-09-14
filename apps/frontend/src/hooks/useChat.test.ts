@@ -4,12 +4,19 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 vi.mock("../lib/a2a", () => ({ getClient: vi.fn() }));
 vi.mock("../lib/upload", () => ({ uploadFile: vi.fn() }));
 vi.mock("../lib/history", () => ({ saveConversation: vi.fn() }));
+vi.mock("../lib/notify", () => ({
+  notifyIfHidden: vi.fn(),
+  getNotificationPermission: vi.fn(() => "granted"),
+  requestNotificationPermission: vi.fn(async () => "granted"),
+}));
 
 import { Role, TaskState, type Message, type Part, type StreamResponse, type Task, type TaskStatus } from "@a2a-js/sdk";
 import { getClient } from "../lib/a2a";
 import { uploadFile } from "../lib/upload";
 import { saveConversation } from "../lib/history";
+import { notifyIfHidden } from "../lib/notify";
 import { useChatStore } from "../store/chat";
+import { useNotificationsStore } from "../store/notifications";
 import { useChat } from "./useChat";
 import type { ModelInfo } from "../lib/models";
 
@@ -84,6 +91,8 @@ beforeEach(() => {
   vi.mocked(uploadFile).mockReset();
   vi.mocked(saveConversation).mockReset().mockResolvedValue(undefined);
   vi.mocked(getClient).mockReset();
+  vi.mocked(notifyIfHidden).mockReset();
+  useNotificationsStore.setState({ enabled: false, permission: "granted" });
 });
 
 afterEach(() => {
@@ -210,6 +219,59 @@ test("a status-update in 'failed' records the failure message", async () => {
   await act(async () => result.current.send("hi", []));
 
   expect(useChatStore.getState().turns.at(-1)!.error).toBe("went wrong");
+});
+
+test("notifies on completion when notifications are enabled", async () => {
+  useNotificationsStore.setState({ enabled: true, permission: "granted" });
+  const client = fakeClient([
+    statusEvent({ state: TaskState.TASK_STATE_COMPLETED, message: agentMessage([textPart("final")]), timestamp: "t" }),
+  ]);
+  vi.mocked(getClient).mockResolvedValue(client as never);
+  const { result } = renderHook(() => useChat());
+
+  await act(async () => result.current.send("hi", []));
+
+  expect(notifyIfHidden).toHaveBeenCalledWith("Response ready", "final");
+});
+
+test("does not notify when notifications are disabled", async () => {
+  const client = fakeClient([
+    statusEvent({ state: TaskState.TASK_STATE_COMPLETED, message: agentMessage([textPart("final")]), timestamp: "t" }),
+  ]);
+  vi.mocked(getClient).mockResolvedValue(client as never);
+  const { result } = renderHook(() => useChat());
+
+  await act(async () => result.current.send("hi", []));
+
+  expect(notifyIfHidden).not.toHaveBeenCalled();
+});
+
+test("notifies on failure and on input-required when enabled, but not on cancel", async () => {
+  useNotificationsStore.setState({ enabled: true, permission: "granted" });
+
+  const failedClient = fakeClient([
+    statusEvent({ state: TaskState.TASK_STATE_FAILED, message: agentMessage([textPart("boom")]), timestamp: "t" }),
+  ]);
+  vi.mocked(getClient).mockResolvedValue(failedClient as never);
+  const { result: r1 } = renderHook(() => useChat());
+  await act(async () => r1.current.send("hi", []));
+  expect(notifyIfHidden).toHaveBeenCalledWith("Something went wrong", "boom");
+
+  vi.mocked(notifyIfHidden).mockClear();
+  const pausedClient = fakeClient([
+    statusEvent({ state: TaskState.TASK_STATE_INPUT_REQUIRED, message: agentMessage([]), timestamp: "t" }),
+  ]);
+  vi.mocked(getClient).mockResolvedValue(pausedClient as never);
+  const { result: r2 } = renderHook(() => useChat());
+  await act(async () => r2.current.send("hi", []));
+  expect(notifyIfHidden).toHaveBeenCalledWith("Needs your approval", expect.any(String));
+
+  vi.mocked(notifyIfHidden).mockClear();
+  const canceledClient = fakeClient([statusEvent({ state: TaskState.TASK_STATE_CANCELED, message: agentMessage([]), timestamp: "t" })]);
+  vi.mocked(getClient).mockResolvedValue(canceledClient as never);
+  const { result: r3 } = renderHook(() => useChat());
+  await act(async () => r3.current.send("hi", []));
+  expect(notifyIfHidden).not.toHaveBeenCalled();
 });
 
 test("a bare 'message' event finishes the turn with its text", async () => {

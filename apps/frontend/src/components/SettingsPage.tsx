@@ -34,6 +34,7 @@ import {
   type PullProgressEvent,
 } from "../lib/modelManagement";
 import { formatBytes } from "../lib/format";
+import { useNotificationsStore } from "../store/notifications";
 import { useThemeStore, type ThemePreference } from "../store/theme";
 
 const APPEARANCE_OPTIONS: { value: ThemePreference; label: string; icon: typeof SunIcon }[] = [
@@ -195,6 +196,13 @@ export function SettingsPage() {
               Appearance
             </h2>
             <AppearanceControl />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-xs font-medium tracking-wide text-slate-400 uppercase dark:text-slate-500">
+              Notifications
+            </h2>
+            <NotificationsControl />
           </section>
         </div>
       </div>
@@ -523,6 +531,56 @@ function AppearanceControl() {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function NotificationsControl() {
+  const enabled = useNotificationsStore((s) => s.enabled);
+  const permission = useNotificationsStore((s) => s.permission);
+  const setEnabled = useNotificationsStore((s) => s.setEnabled);
+
+  const unsupported = permission === "unsupported";
+  const blocked = permission === "denied";
+  const checked = enabled && permission === "granted";
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-4 rounded-full bg-white/70 px-4 py-2.5 ring-1 ring-slate-200/70 backdrop-blur-md dark:bg-slate-900/70 dark:ring-slate-700/60">
+        <span className="text-sm text-slate-700 dark:text-slate-200">
+          Notify me when a response finishes or a document is ready
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-label="Notify me when a response finishes or a document is ready"
+          disabled={unsupported || blocked}
+          onClick={() => void setEnabled(!checked)}
+          className="flex shrink-0 items-center justify-center rounded-full p-2 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/60 disabled:opacity-50 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        >
+          <span
+            aria-hidden="true"
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              checked ? "bg-linear-to-r from-blue-500 to-indigo-500" : "bg-slate-200 dark:bg-slate-700"
+            }`}
+          >
+            <span
+              className={`inline-block size-4.5 transform rounded-full bg-white transition-transform ${
+                checked ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </span>
+        </button>
+      </div>
+      {unsupported && (
+        <p className="px-2 text-xs text-slate-400 dark:text-slate-500">Not supported in this browser.</p>
+      )}
+      {blocked && (
+        <p className="px-2 text-xs text-rose-500 dark:text-rose-400">
+          Blocked in your browser&apos;s site settings — allow notifications there to enable this.
+        </p>
+      )}
     </div>
   );
 }

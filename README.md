@@ -26,6 +26,7 @@ machine.
 - **Read a URL directly** — full page content as markdown, via the official `mcp-server-fetch` MCP server. [docs/tools.md](docs/tools.md)
 - **Mermaid diagrams** — the model draws a diagram inline in its reply, rendered client-side. [docs/frontend.md](docs/frontend.md)
 - **Voice input** — record a mic clip, transcribed locally (whisper.cpp) into the composer for you to review before sending. [docs/architecture.md](docs/architecture.md)
+- **Background notifications** — get notified when a response finishes, a tool call needs your approval, or a document finishes processing, while the tab isn't focused. [docs/frontend.md](docs/frontend.md)
 - **Extensible by design** — three tiers for adding capabilities (consume an MCP server / write a first-party MCP server / stand up a peer A2A agent), all config-driven. [docs/architecture.md](docs/architecture.md#extending-the-agent-three-tiers)
 
 ## Architecture
@@ -81,6 +82,7 @@ All phases below are built and browser-verified:
 - ✅ Document/diagram generation (docx/pptx/pdf/xlsx/csv/txt, draw.io) + URL reading + mermaid diagrams
 - ✅ Voice input (local whisper.cpp transcription)
 - ✅ Installable PWA with an offline-capable app shell
+- ✅ Background notifications (response/HITL/document-ready, tab-hidden only)
 
 Not built: authentication/multi-user support, a hosted deployment story —
 this is a personal, single-user, local-first project. CI runs typecheck +
