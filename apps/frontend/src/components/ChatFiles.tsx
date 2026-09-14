@@ -7,7 +7,9 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { getDocument, type DocumentSummary } from "../lib/documents";
+import { notifyIfHidden } from "../lib/notify";
 import { useChatStore } from "../store/chat";
+import { useNotificationsStore } from "../store/notifications";
 import type { PendingAttachment } from "../hooks/useAttachments";
 import { canPreviewAttachment, type ViewableAttachment } from "../lib/attachmentPreview";
 import { AttachmentViewer } from "./AttachmentViewer";
@@ -159,6 +161,21 @@ export function ChatFiles({ attachments, removeAttachment }: ChatFilesProps) {
         }),
       );
       if (cancelled) return;
+      if (useNotificationsStore.getState().enabled) {
+        results.forEach((doc, i) => {
+          // prevEntry is undefined on the very first fetch for this id — never notify
+          // then, since a document already resolved by the time we started watching it
+          // isn't a transition, just its existing state.
+          const prevEntry = docsRef.current[activeIds[i]!];
+          const wasPending = prevEntry !== undefined && prevEntry !== "removed" && prevEntry.status === "pending";
+          if (wasPending && doc !== "removed" && doc.status !== "pending") {
+            notifyIfHidden(
+              doc.status === "ready" ? "Document ready" : "Document failed to process",
+              doc.originalName,
+            );
+          }
+        });
+      }
       setDocs((prev) => {
         const next = { ...prev };
         results.forEach((doc, i) => {

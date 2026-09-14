@@ -338,3 +338,26 @@ dispatch order is exactly the kind of claim to verify against the library's
 own source (or a targeted live test of the specific claim, not just "the
 feature works") before writing it into a comment — this one worked by
 accident of a *correct* fix paired with an *incorrect* explanation for why.
+
+## CDP browser automation can't click through a native Notification permission prompt
+
+**General browser-testing lesson, not specific to this repo.** The
+Notification permission prompt is native browser chrome, not a DOM element
+or a JS `alert`/`confirm`/`prompt` dialog — so no CDP-driven click, and no
+`dialogAction`-style dialog handler, can accept or dismiss it. Clicking a
+button that calls `Notification.requestPermission()` through
+Chrome DevTools Protocol tooling (the `chrome-devtools` MCP server here)
+leaves `Notification.permission` stuck at `"default"` indefinitely — it
+*looks* like the click silently did nothing, which is a plausible enough
+outcome that it's worth ruling out explicitly rather than assuming the app
+code is broken.
+
+**Fix**: grant the permission at the automation layer instead of trying to
+click through the browser's UI. Playwright exposes this directly —
+`await page.context().grantPermissions(["notifications"], { origin })` —
+which the `chrome-devtools` MCP server doesn't expose, so a Playwright MCP
+session (`browser_run_code_unsafe`) is the tool to reach for whenever a
+live-verification pass needs a real, browser-enforced `"granted"` state
+rather than a mocked one. Verified live for the notifications feature
+(`lib/notify.ts`): granted via Playwright, then confirmed the actual
+running app reacted correctly to a real permission grant end-to-end.

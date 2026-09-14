@@ -16,6 +16,10 @@ vi.mock("../lib/modelManagement", async () => {
     pullModel: vi.fn(),
   };
 });
+vi.mock("../lib/notify", () => ({
+  getNotificationPermission: vi.fn(),
+  requestNotificationPermission: vi.fn(),
+}));
 
 import {
   deleteModel,
@@ -26,6 +30,8 @@ import {
   setImageGenModel,
 } from "../lib/modelManagement";
 import type { ModelSummary } from "../lib/modelManagement";
+import { requestNotificationPermission } from "../lib/notify";
+import { useNotificationsStore } from "../store/notifications";
 import { useThemeStore } from "../store/theme";
 import { SettingsPage } from "./SettingsPage";
 
@@ -53,6 +59,8 @@ beforeEach(() => {
   vi.mocked(deleteModel).mockReset().mockResolvedValue(undefined);
   vi.mocked(pullModel).mockReset();
   useThemeStore.setState({ preference: "auto", resolved: "light" });
+  vi.mocked(requestNotificationPermission).mockReset();
+  useNotificationsStore.setState({ enabled: false, permission: "default" });
 });
 
 afterEach(() => {
@@ -317,4 +325,39 @@ test("a failed download shows an error message", async () => {
   await user.click(screen.getByRole("button", { name: "Download" }));
 
   await waitFor(() => expect(screen.getByText("model not found")).toBeInTheDocument());
+});
+
+test("the notifications toggle requests permission and turns on only when granted", async () => {
+  vi.mocked(fetchAllModels).mockResolvedValue({ models: [], defaultModel: "", imageGenModel: "", embeddingModel: "" });
+  vi.mocked(requestNotificationPermission).mockResolvedValue("granted");
+  const user = userEvent.setup();
+  render(<SettingsPage />);
+
+  const toggle = screen.getByRole("switch", { name: /notify me/i });
+  expect(toggle).toHaveAttribute("aria-checked", "false");
+
+  await user.click(toggle);
+
+  expect(requestNotificationPermission).toHaveBeenCalled();
+  await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+});
+
+test("the notifications toggle is disabled and explains why when permission is denied", async () => {
+  vi.mocked(fetchAllModels).mockResolvedValue({ models: [], defaultModel: "", imageGenModel: "", embeddingModel: "" });
+  useNotificationsStore.setState({ enabled: false, permission: "denied" });
+  render(<SettingsPage />);
+
+  const toggle = screen.getByRole("switch", { name: /notify me/i });
+  expect(toggle).toBeDisabled();
+  expect(screen.getByText(/blocked in your browser/i)).toBeInTheDocument();
+});
+
+test("the notifications toggle is disabled with an unsupported message when the API is missing", async () => {
+  vi.mocked(fetchAllModels).mockResolvedValue({ models: [], defaultModel: "", imageGenModel: "", embeddingModel: "" });
+  useNotificationsStore.setState({ enabled: false, permission: "unsupported" });
+  render(<SettingsPage />);
+
+  const toggle = screen.getByRole("switch", { name: /notify me/i });
+  expect(toggle).toBeDisabled();
+  expect(screen.getByText(/not supported in this browser/i)).toBeInTheDocument();
 });

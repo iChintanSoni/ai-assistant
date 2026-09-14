@@ -243,3 +243,66 @@ an offline-capable app shell (decision 9 in `PLAN.md`).
   browser from testing against `vite preview`, do a hard reset — DevTools →
   Application → Service Workers → Unregister, then a hard reload
   (`Cmd+Shift+R`). See `docs/setup.md` for the install/testing walkthrough.
+
+## Notifications — `lib/notify.ts` + `store/notifications.ts`
+
+A background-completion notification (R2's "Notification API" catalogue
+item), via the page's own `Notification` constructor — **no service worker
+and no push server**. That's a deliberate scope limit, not an oversight:
+this only fires while the tab/installed-app process is still alive, just not
+focused (switched away, minimized, another app in front); a true
+fully-closed-app push would need the Push API plus a push server, which
+conflicts with local-first (`PLAN.md` §I3).
+
+- **`lib/notify.ts`** is the pure browser-API wrapper: `canNotify()` feature-
+  detects `"Notification" in window` and checks `Notification.permission
+  === "granted"`; `notifyIfHidden(title, body?)` fires only when
+  `document.visibilityState === "hidden"` — while the tab is visible the
+  live UI already shows the same information, so a notification would just
+  be redundant — wrapped in try/catch so a notification failure can never
+  interrupt the flow that triggered it (§I7). Clicking the notification
+  calls `window.focus()` since this is a same-page `Notification` instance,
+  not a service-worker-shown one — no `clients.openWindow` needed.
+- **`store/notifications.ts`** owns the user's preference, mirroring
+  `store/theme.ts`'s shape exactly: `enabled` (persisted to
+  `localStorage["aurora-notifications"]`) and `permission` (the browser's
+  live `Notification.permission` — **always re-read fresh, never restored
+  from storage**, since the OS/browser is the actual source of truth and
+  can be revoked outside the app). `setEnabled(true)` calls
+  `Notification.requestPermission()` — only invoke this from a real click
+  handler (a user-gesture context), never on mount, or the browser can
+  silently auto-deny the prompt. `setEnabled(false)` never prompts.
+- **Two trigger points**, both extending an *existing* state-transition
+  observer rather than adding new polling (§I10):
+  - `hooks/useChat.ts`'s `handleEvent` — the single place a turn already
+    reaches `TASK_STATE_COMPLETED`/`FAILED`/`INPUT_REQUIRED` — calls
+    `notifyIfHidden` for completion, failure, and the HITL
+    input-required pause. `TASK_STATE_CANCELED` deliberately does not
+    notify (user-initiated; they already know).
+  - `components/ChatFiles.tsx`'s existing 1.5s ingest-status poll diffs
+    each document's previous vs. new `status` and calls `notifyIfHidden`
+    only on a genuine `pending → ready|failed` transition — **not** on the
+    initial fetch, even if that first fetch already returns a resolved
+    status (a document already done by the time you started watching it
+    isn't a transition, just its existing state; notifying then would be a
+    false positive on every page load).
+- **Settings UI**: `components/SettingsPage.tsx`'s "Notifications" section
+  (next to "Appearance") is a `role="switch"` toggle — disabled with an
+  explanatory message when permission is `"denied"` (browsers refuse to
+  re-prompt once denied; the only fix is the browser's own site settings)
+  or `"unsupported"`.
+- **Verified live** (see `docs/gotchas.md`'s CDP-permission-prompt entry for
+  why plain click automation couldn't grant permission directly): real
+  Chrome, permission granted via Playwright's
+  `context.grantPermissions(["notifications"], {origin})` — sent a message
+  to real Ollama with the tab hidden, got a real "Response ready"
+  notification on completion; triggered
+  `generate_image` (HITL-gated) and got "Needs your approval"; confirmed no
+  notification at all while the tab was visible; confirmed the document
+  pending→ready path via a real upload with `/documents/:id` responses
+  intercepted (this dev environment's Docling install already fails every
+  ingest in ~2ms, a pre-existing environment issue unrelated to this
+  feature — confirmed via existing failed records' near-identical
+  `createdAt`/`updatedAt`, so there's no real pending window to observe
+  end-to-end here). Settings toggle checked at 375×812 and 1440×900, light
+  and dark, plus keyboard focus (visible ring) and Enter-key activation.
